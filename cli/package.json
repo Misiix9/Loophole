@@ -1,0 +1,33 @@
+{
+  "name": "loophole-cli",
+  "version": "1.0.0",
+  "description": "The Loophole CLI - Expose your localhost to the world.",
+  "main": "src/cli.js",
+  "bin": {
+    "loophole": "bin/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node bin/index.js start"
+  },
+  "keywords": [
+    "tunnel",
+    "localhost",
+    "proxy",
+    "loophole"
+  ],
+  "author": "Loophole",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.10",
+    "boxen": "^8.0.1",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "dotenv": "^16.4.7",
+    "inquirer": "^13.0.2",
+    "localtunnel": "^2.0.2",
+    "open": "^11.0.0",
+    "ora": "^9.0.0"
+  }
+}
