@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Github, Loader2, X, AlertTriangle } from "lucide-react"
 import Link from 'next/link'
+import Image from "next/image";
 
 const TextFlow = ({ text, className = "" }: { text: string, className?: string }) => (
   <div className={`relative overflow-hidden h-[1.2em] flex items-center justify-center ${className}`}>
@@ -72,8 +73,16 @@ export default function LoginPage() {
         <Link href="/" className="absolute top-4 right-4 p-2 rounded-full hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-all hover:rotate-90 duration-300 group">
            <X className="h-5 w-5 group-hover:scale-110 transition-transform" />
         </Link>
+
         <CardHeader className="text-center space-y-4 pt-8 pb-6">
-           <div className="mx-auto h-12 w-12 bg-accent rounded-xl flex items-center justify-center font-bold text-2xl text-white shadow-lg shadow-accent/20 mb-2 transition-transform hover:scale-110 hover:rotate-3 duration-300 cursor-default select-none">L</div>
+           <div className="mx-auto relative h-12 w-12 mb-2 transition-transform hover:scale-110 hover:rotate-3 duration-300 cursor-default select-none">
+             <Image 
+               src="/logo.png" 
+               alt="Loophole Logo" 
+               fill
+               className="object-contain drop-shadow-lg shadow-accent/20"
+             />
+           </div>
           
            <div className="space-y-1">
                 <CardTitle className="text-2xl font-bold tracking-tight text-foreground flex justify-center">

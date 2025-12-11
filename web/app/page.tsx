@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Terminal, Globe, Shield, Zap } from "lucide-react";
+import Image from "next/image";
 
 export default function Home() {
   return (
@@ -9,9 +10,13 @@ export default function Home() {
       {/* Navbar */}
       <header className="flex items-center justify-between px-8 py-6 sticky top-0 bg-background/80 backdrop-blur z-50 border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="size-8 rounded-lg bg-accent flex items-center justify-center shadow-lg shadow-accent/20">
-             <div className="size-3 rounded-full bg-white animate-pulse" />
-          </div>
+          <Image 
+             src="/logo.png" 
+             alt="Loophole" 
+             width={32} 
+             height={32} 
+             className="rounded-lg shadow-lg shadow-accent/20"
+          />
           <span className="text-xl font-bold tracking-tight">Loophole</span>
         </div>
         <nav className="flex items-center gap-6">

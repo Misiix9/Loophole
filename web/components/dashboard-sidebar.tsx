@@ -14,6 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import Image from "next/image";
 
 type Team = {
   id: string;
@@ -95,7 +96,13 @@ export function DashboardSidebar() {
         {/* Header */}
         <div className={cn("flex items-center h-16 px-4", isCollapsed ? "justify-center" : "justify-between")}>
              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 bg-accent rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-accent/20">L</div>
+                <Image 
+                  src="/logo.png" 
+                  alt="Loophole" 
+                  width={32} 
+                  height={32} 
+                  className="rounded-lg shadow-lg shadow-accent/20"
+                />
                 {!isCollapsed && <span className="font-bold text-lg tracking-tight text-foreground">Loophole</span>}
              </div>
              
