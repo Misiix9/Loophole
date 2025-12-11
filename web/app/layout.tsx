@@ -14,19 +14,19 @@ export const metadata: Metadata = {
   },
 };
 
+import { SidebarProvider } from "@/components/sidebar-provider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className={cn(
-          "min-h-screen bg-background font-sans antialiased text-foreground",
-          lexend.variable,
-          jetbrainsMono.variable
-        )}>
-        {children}
+    <html lang="en" className={`${lexend.variable} scroll-behavior-smooth`}>
+      <body className="font-sans antialiased bg-background text-foreground selection:bg-accent/30 selection:text-white">
+        <SidebarProvider>
+          {children}
+        </SidebarProvider>
       </body>
     </html>
   );

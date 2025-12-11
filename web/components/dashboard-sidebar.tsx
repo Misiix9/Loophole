@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
@@ -15,6 +13,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import Image from "next/image";
+import { useSidebar } from "@/components/sidebar-provider";
 
 type Team = {
   id: string;
@@ -24,7 +23,7 @@ type Team = {
 
 export function DashboardSidebar() {
   const [teams, setTeams] = useState<Team[]>([]);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { isCollapsed, toggleSidebar } = useSidebar();
   const pathname = usePathname();
   const supabase = createClient();
 
@@ -34,16 +33,7 @@ export function DashboardSidebar() {
       if (data) setTeams(data);
     };
     fetchTeams();
-
-    const savedState = localStorage.getItem('sidebar-collapsed');
-    if (savedState) setIsCollapsed(JSON.parse(savedState));
   }, []);
-
-  const toggleSidebar = () => {
-    const newState = !isCollapsed;
-    setIsCollapsed(newState);
-    localStorage.setItem('sidebar-collapsed', JSON.stringify(newState));
-  };
 
   const NavItem = ({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive: boolean }) => {
      const ButtonContent = (

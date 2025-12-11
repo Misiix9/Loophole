@@ -2,6 +2,8 @@
 
 import { useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Settings } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
 import { Users, Terminal, Check, Copy } from "lucide-react";
@@ -97,12 +99,18 @@ export default function TeamDashboard({ params }: { params: Promise<{ teamSlug: 
                 </div>
             </div>
             
-            <Dialog>
-                <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="border-border hover:bg-secondary text-foreground">
-                        New Team Tunnel
-                    </Button>
-                </DialogTrigger>
+            <div className="flex items-center gap-2">
+                <Button variant="outline" asChild size="sm" className="border-border hover:bg-secondary text-foreground">
+                    <Link href={`/dashboard/${teamSlug}/settings`}>
+                         <Settings className="mr-2 h-4 w-4" /> Team Settings
+                    </Link>
+                </Button>
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="border-border hover:bg-secondary text-foreground">
+                            New Team Tunnel
+                        </Button>
+                    </DialogTrigger>
                 <DialogContent className="bg-card border-border text-foreground">
                     <DialogHeader>
                         <DialogTitle>Start a Team Tunnel</DialogTitle>
@@ -125,10 +133,11 @@ export default function TeamDashboard({ params }: { params: Promise<{ teamSlug: 
                             <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground group-hover:text-foreground">
                                 {copiedCmd ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
                             </Button>
+                            </div>
                         </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+                    </DialogContent>
+                </Dialog>
+            </div>
         </header>
         
         <div className="p-6 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
