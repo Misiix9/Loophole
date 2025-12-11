@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, ExternalLink, Globe } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 type Tunnel = {
@@ -41,9 +41,6 @@ export default function CommunityPage() {
     };
 
     fetchPublicTunnels();
-    
-    // Realtime subscription for public tunnels could be good, but polling is safer for now?
-    // Let's just stick to initial fetch for simplicity in Phase 2.3
   }, []);
 
   const filteredTunnels = tunnels.filter(t => 
@@ -51,29 +48,30 @@ export default function CommunityPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 p-8">
+    <div className="min-h-screen bg-background text-foreground p-8">
       <header className="max-w-7xl mx-auto mb-12 flex flex-col md:flex-row justify-between items-center gap-6">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
-            Community Tunnels
+          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-muted-foreground mb-2 flex items-center gap-3">
+             <Globe className="h-8 w-8 text-accent" />
+             Community Tunnels
           </h1>
-          <p className="text-slate-400">
+          <p className="text-muted-foreground">
             Explore public projects shared by the Loophole community.
           </p>
         </div>
         
         <div className="flex items-center gap-4 w-full md:w-auto">
              <div className="relative w-full md:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                     placeholder="Search projects..." 
-                    className="pl-9 bg-slate-900 border-slate-800 focus:border-purple-500"
+                    className="pl-9 bg-card border-border focus:border-accent"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
             </div>
             <Link href="/dashboard">
-                <Button variant="outline" className="border-slate-700 hover:bg-slate-800">
+                <Button variant="outline" className="border-border hover:bg-secondary">
                     My Dashboard
                 </Button>
             </Link>
@@ -82,34 +80,34 @@ export default function CommunityPage() {
 
       <main className="max-w-7xl mx-auto grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {isLoading ? (
-             <div className="col-span-full text-center py-20 text-slate-500 animate-pulse">
+             <div className="col-span-full text-center py-20 text-muted-foreground animate-pulse">
                 Loading community projects...
              </div>
         ) : filteredTunnels.length === 0 ? (
-            <div className="col-span-full text-center py-20 border border-dashed border-slate-800 rounded-xl bg-slate-900/50">
-                <p className="text-slate-400 text-lg">No public tunnels found right now.</p>
-                <p className="text-sm text-slate-500 mt-2">
-                    Start a public tunnel with <code className="bg-slate-950 px-1 py-0.5 rounded text-purple-400">loophole start 3000 --public</code>
-                </p>
+            <div className="col-span-full text-center py-20 border border-dashed border-border rounded-xl bg-card/30">
+                <p className="text-foreground text-lg">No public tunnels found right now.</p>
+                <div className="text-sm text-muted-foreground mt-4 font-mono bg-card px-4 py-2 rounded-lg inline-block border border-border">
+                    <span className="text-accent">$</span> loophole start 3000 --public
+                </div>
             </div>
         ) : (
             filteredTunnels.map((tunnel) => (
-                <Card key={tunnel.id} className="bg-slate-900/50 border-slate-800 hover:border-purple-500/50 transition-colors group">
+                <Card key={tunnel.id} className="bg-card border-border hover:border-accent/50 transition-all duration-300 group overflow-hidden hover:scale-[1.02] animate-in fade-in zoom-in slide-in-from-bottom-4 fill-mode-backwards">
                     <CardHeader>
                         <div className="flex justify-between items-start">
-                            <div>
-                                <CardTitle className="text-lg text-purple-200 group-hover:text-purple-300 transition-colors">
+                            <div className="overflow-hidden pr-4">
+                                <CardTitle className="text-lg text-foreground group-hover:text-accent transition-colors truncate">
                                     {tunnel.project_name || 'Untitled Project'}
                                 </CardTitle>
-                                <CardDescription className="text-slate-500 text-xs mt-1">
+                                <CardDescription className="text-muted-foreground text-xs mt-1">
                                     Launched {new Date(tunnel.created_at).toLocaleDateString()}
                                 </CardDescription>
                             </div>
-                            <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10B981]"></div>
+                            <div className="h-2 w-2 rounded-full bg-success shadow-[0_0_8px_var(--success)] shrink-0"></div>
                         </div>
                     </CardHeader>
                     <CardContent>
-                         <div className="p-3 bg-slate-950 rounded border border-slate-800/50 font-mono text-xs text-slate-300 break-all opacity-80 group-hover:opacity-100 transition-opacity">
+                         <div className="p-3 bg-secondary/50 rounded border border-border/50 font-mono text-xs text-muted-foreground break-all opacity-80 group-hover:opacity-100 transition-opacity">
                             {tunnel.current_url}
                         </div>
                     </CardContent>
@@ -120,8 +118,8 @@ export default function CommunityPage() {
                             rel="noopener noreferrer" 
                             className="w-full"
                         >
-                            <Button className="w-full bg-purple-600 hover:bg-purple-500 text-white">
-                                Visit Site
+                            <Button className="w-full bg-accent hover:bg-accent/90 text-white shadow-lg shadow-accent/20">
+                                Visit Site <ExternalLink className="h-4 w-4 ml-2" />
                             </Button>
                         </a>
                     </CardFooter>

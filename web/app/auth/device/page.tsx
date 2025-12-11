@@ -64,23 +64,23 @@ function DeviceAuthContent() {
 
     if (status === 'loading') {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white">
-                <Loader2 className="h-8 w-8 animate-spin text-emerald-500 mb-4" />
-                <p>Verifying session...</p>
+            <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+                <Loader2 className="h-8 w-8 animate-spin text-accent mb-4" />
+                <p className="text-muted-foreground">Verifying session...</p>
             </div>
         );
     }
 
     if (status === 'success') {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white p-4">
-                <Card className="w-full max-w-md bg-slate-900 border-emerald-500/50">
+            <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
+                <Card className="w-full max-w-md bg-card border-accent/50 shadow-2xl shadow-accent/20">
                     <CardHeader className="text-center">
-                        <div className="mx-auto bg-emerald-500/10 p-3 rounded-full w-fit mb-4">
-                            <CheckCircle className="h-8 w-8 text-emerald-500" />
+                        <div className="mx-auto bg-success/10 p-4 rounded-full w-fit mb-4 border border-success/20">
+                            <CheckCircle className="h-8 w-8 text-success" />
                         </div>
-                        <CardTitle className="text-2xl text-white">Successfully Authenticated</CardTitle>
-                        <CardDescription className="text-slate-400">
+                        <CardTitle className="text-2xl text-foreground">Successfully Authenticated</CardTitle>
+                        <CardDescription className="text-muted-foreground">
                             You can now close this window and return to your terminal.
                         </CardDescription>
                     </CardHeader>
@@ -91,14 +91,14 @@ function DeviceAuthContent() {
 
     if (status === 'error') {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white p-4">
-                <Card className="w-full max-w-md bg-slate-900 border-red-500/50">
+            <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
+                <Card className="w-full max-w-md bg-card border-destructive/50">
                     <CardHeader className="text-center">
-                        <div className="mx-auto bg-red-500/10 p-3 rounded-full w-fit mb-4">
-                            <XCircle className="h-8 w-8 text-red-500" />
+                        <div className="mx-auto bg-destructive/10 p-4 rounded-full w-fit mb-4 border border-destructive/20">
+                            <XCircle className="h-8 w-8 text-destructive" />
                         </div>
-                        <CardTitle className="text-2xl text-white">Authentication Failed</CardTitle>
-                        <CardDescription className="text-red-400">
+                        <CardTitle className="text-2xl text-foreground">Authentication Failed</CardTitle>
+                        <CardDescription className="text-destructive">
                             {errorMsg}
                         </CardDescription>
                     </CardHeader>
@@ -108,31 +108,33 @@ function DeviceAuthContent() {
     }
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white p-4">
-             <Card className="w-full max-w-md bg-slate-900 border-slate-800">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
+             <Card className="w-full max-w-md bg-card border-border shadow-xl">
                 <CardHeader>
-                    <div className="flex items-center justify-center mb-4">
-                         <Terminal className="h-10 w-10 text-slate-400" />
+                    <div className="flex items-center justify-center mb-6">
+                         <div className="p-4 bg-secondary rounded-xl">
+                            <Terminal className="h-8 w-8 text-foreground" />
+                         </div>
                     </div>
-                    <CardTitle className="text-center text-white text-xl">Authorize CLI</CardTitle>
-                    <CardDescription className="text-center text-slate-400">
+                    <CardTitle className="text-center text-foreground text-xl">Authorize CLI</CardTitle>
+                    <CardDescription className="text-center text-muted-foreground">
                         Do you want to authorize the Loophole CLI to access your account?
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 font-mono text-center text-sm text-yellow-400">
+                <CardContent className="space-y-6">
+                    <div className="bg-black/50 p-6 rounded-lg border border-border font-mono text-center text-2xl tracking-widest text-accent font-bold shadow-inner">
                         {code}
                     </div>
                     <div className="flex gap-4">
-                        <Button variant="outline" className="w-full border-slate-700 hover:bg-slate-800 text-white" onClick={() => setStatus('error')}>
+                        <Button variant="outline" className="w-full border-border hover:bg-secondary text-foreground" onClick={() => setStatus('error')}>
                             Cancel
                         </Button>
-                        <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleApprove}>
+                        <Button className="w-full bg-accent hover:bg-accent/90 text-white font-bold" onClick={handleApprove}>
                             Authorize
                         </Button>
                     </div>
-                    <p className="text-xs text-center text-slate-500">
-                        Signed in as {user?.email}
+                    <p className="text-xs text-center text-muted-foreground">
+                        Signed in as <span className="text-foreground">{user?.email}</span>
                     </p>
                 </CardContent>
             </Card>
@@ -142,7 +144,7 @@ function DeviceAuthContent() {
 
 export default function DeviceAuthPage() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">Loading...</div>}>
+        <Suspense fallback={<div className="min-h-screen bg-background text-foreground flex items-center justify-center">Loading...</div>}>
             <DeviceAuthContent />
         </Suspense>
     );

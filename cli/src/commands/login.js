@@ -25,8 +25,8 @@ export async function login() {
         if (error) throw error;
 
         const deviceCode = request.device_code;
-        // Adjust URL for production later (env var or config)
-        const authUrl = `http://localhost:3000/auth/device?code=${deviceCode}`;
+        const baseUrl = process.env.LOOPHOLE_WEB_URL || 'https://loophole.run';
+        const authUrl = `${baseUrl}/auth/device?code=${deviceCode}`;
 
         spinner.info(`Device Code: ${chalk.cyan(deviceCode)}`);
         spinner.info(`Opening browser to: ${authUrl}`);

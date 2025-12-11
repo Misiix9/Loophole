@@ -4,7 +4,7 @@ import { useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Users, Terminal } from "lucide-react";
+import { Users, Terminal, Check, Copy } from "lucide-react";
 import { TunnelCard } from "@/components/tunnel-card";
 
 type Tunnel = {
@@ -26,6 +26,7 @@ export default function TeamDashboard({ params }: { params: Promise<{ teamSlug: 
 
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
   const [team, setTeam] = useState<Team | null>(null);
+  const [copiedCmd, setCopiedCmd] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -44,7 +45,8 @@ export default function TeamDashboard({ params }: { params: Promise<{ teamSlug: 
         const { data: tunnelData } = await supabase
             .from('tunnels')
             .select('*')
-            .eq('team_id', teamData.id);
+            .eq('team_id', teamData.id)
+            .order('last_heartbeat', { ascending: false });
         
         if (tunnelData) setTunnels(tunnelData);
 
@@ -74,49 +76,68 @@ export default function TeamDashboard({ params }: { params: Promise<{ teamSlug: 
     init();
   }, [teamSlug]);
 
-  if (!team) return <div className="p-10 text-slate-500">Loading Team...</div>;
+  if (!team) return <div className="p-10 text-muted-foreground animate-pulse">Loading Team...</div>;
+
+  const handleCopyCmd = () => {
+      navigator.clipboard.writeText(`loophole start 3000 --team ${team.slug}`);
+      setCopiedCmd(true);
+      setTimeout(() => setCopiedCmd(false), 2000);
+  };
 
   return (
-      <div className="h-full flex flex-col">
-        <header className="h-16 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur shrink-0">
+      <div className="h-full flex flex-col bg-background text-foreground">
+        <header className="h-16 border-b border-border flex items-center justify-between px-6 bg-card/80 backdrop-blur shrink-0 sticky top-0 z-10 transition-all">
             <div className="flex items-center gap-4">
                 <div className="flex flex-col">
-                    <h1 className="text-xl font-semibold flex items-center gap-2">
-                        <Users className="h-5 w-5 text-indigo-400" />
+                    <h1 className="text-xl font-semibold flex items-center gap-2 tracking-tight text-foreground">
+                        <Users className="h-5 w-5 text-accent" />
                         {team.name}
                     </h1>
-                    <span className="text-xs text-slate-500 uppercase tracking-widest">Team Workspace</span>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Team Workspace</span>
                 </div>
             </div>
             
             <Dialog>
                 <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">New Team Tunnel</Button>
+                    <Button variant="outline" size="sm" className="border-border hover:bg-secondary text-foreground">
+                        New Team Tunnel
+                    </Button>
                 </DialogTrigger>
-                <DialogContent className="bg-slate-950 border-slate-800 text-slate-200">
+                <DialogContent className="bg-card border-border text-foreground">
                     <DialogHeader>
                         <DialogTitle>Start a Team Tunnel</DialogTitle>
-                        <DialogDescription className="text-slate-400">
+                        <DialogDescription className="text-muted-foreground">
                             Team tunnels run on your machine but are visible to everyone in the team.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="mt-4 p-4 bg-slate-900 rounded border border-slate-800 font-mono text-sm">
-                        <div className="flex items-center gap-2 text-indigo-400 mb-2">
+                    <div 
+                        className="mt-4 p-4 bg-secondary rounded-lg border border-border font-mono text-sm relative group cursor-pointer hover:border-accent/50 transition-colors"
+                        onClick={handleCopyCmd}
+                    >
+                        <div className="flex items-center gap-2 text-accent mb-2">
                             <Terminal className="h-4 w-4" />
-                            <span>CLI Command</span>
+                            <span className="text-xs uppercase font-bold tracking-wider">CLI Command</span>
                         </div>
-                        <div className="text-slate-300">
-                            loophole start 3000 --team {team.slug}
+                        <div className="flex items-center justify-between">
+                             <div className="text-foreground">
+                                loophole start 3000 --team {team.slug}
+                            </div>
+                            <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground group-hover:text-foreground">
+                                {copiedCmd ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
+                            </Button>
                         </div>
                     </div>
                 </DialogContent>
             </Dialog>
         </header>
         
-        <div className="p-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="p-6 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {tunnels.length === 0 && (
-                <div className="col-span-full text-center text-slate-500 py-10">
-                    No active team tunnels. Start one using the CLI.
+                <div className="col-span-full flex flex-col items-center justify-center text-center py-20 border border-dashed border-border/50 rounded-xl bg-card/30">
+                    <div className="space-y-2">
+                         <h3 className="text-lg font-bold text-foreground">No active tunnels</h3>
+                         <p className="text-sm text-muted-foreground">Get started by running the CLI command above.</p>
+                    </div>
                 </div>
             )}
 

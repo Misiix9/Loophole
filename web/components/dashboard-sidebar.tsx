@@ -6,7 +6,14 @@ import { createClient } from "@/utils/supabase/client";
 import { CreateTeamDialog } from "@/components/create-team-dialog";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, Box, Globe, Settings } from "lucide-react";
+import { Users, Box, Globe, Settings, ChevronLeft, ChevronRight, LogOut, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 type Team = {
   id: string;
@@ -16,70 +23,165 @@ type Team = {
 
 export function DashboardSidebar() {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
   const supabase = createClient();
 
-  const fetchTeams = async () => {
-     // For Phase 4, simplified fetching. 
-     // In real app, RLS handles "my teams" filtering automatically.
-     const { data } = await supabase.from('teams').select('*');
-     if (data) setTeams(data);
-  };
-
   useEffect(() => {
+    const fetchTeams = async () => {
+      const { data } = await supabase.from('teams').select('*');
+      if (data) setTeams(data);
+    };
     fetchTeams();
+
+    const savedState = localStorage.getItem('sidebar-collapsed');
+    if (savedState) setIsCollapsed(JSON.parse(savedState));
   }, []);
 
-  return (
-      <aside className="w-64 border-r border-slate-800 bg-slate-900 p-4 hidden md:block flex flex-col">
-        <div className="flex items-center gap-2 mb-8 px-2">
-          <div className="h-8 w-8 bg-emerald-500 rounded-full flex items-center justify-center font-bold text-slate-900">L</div>
-          <span className="font-bold text-lg">Loophole</span>
-        </div>
-        
-        <nav className="space-y-1 flex-1">
-          <div className="px-2 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Personal</div>
-          <Button variant="ghost" asChild className={`w-full justify-start ${pathname === '/dashboard' ? 'bg-emerald-500/10 text-emerald-500 font-medium' : 'text-slate-400'}`}>
-            <Link href="/dashboard">
-                <Box className="mr-2 h-4 w-4" /> My Tunnels
-            </Link>
-          </Button>
-          <Button variant="ghost" asChild className={`w-full justify-start ${pathname === '/community' ? 'bg-emerald-500/10 text-emerald-500 font-medium' : 'text-slate-400'}`}>
-            <Link href="/community">
-                <Globe className="mr-2 h-4 w-4" /> Community
-            </Link>
-          </Button>
+  const toggleSidebar = () => {
+    const newState = !isCollapsed;
+    setIsCollapsed(newState);
+    localStorage.setItem('sidebar-collapsed', JSON.stringify(newState));
+  };
 
-          <div className="px-2 mt-6 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider flex justify-between items-center">
-              <span>Teams</span>
-          </div>
-          
-          <div className="space-y-1">
-            {teams.map(team => (
-                <Button 
-                    key={team.id} 
-                    variant="ghost" 
-                    asChild 
-                    className={`w-full justify-start ${pathname === `/dashboard/${team.slug}` ? 'bg-indigo-500/10 text-indigo-400 font-medium' : 'text-slate-400'}`}
+  const NavItem = ({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive: boolean }) => {
+     const ButtonContent = (
+        <Button 
+            variant="ghost" 
+            asChild 
+            className={cn(
+                "justify-start mb-1 transition-all duration-300", 
+                isActive ? "bg-secondary text-foreground border-l-2 border-accent font-medium rounded-none" : "text-muted-foreground hover:text-foreground",
+                isCollapsed ? "w-10 h-10 px-0 mx-auto justify-center hover:scale-110" : "w-full px-4 hover:translate-x-1"
+            )}
+        >
+            <Link href={href} className="flex items-center">
+                <Icon className={cn("h-4 w-4 shrink-0 transition-all duration-300", isCollapsed ? "h-5 w-5" : "mr-2")} />
+                <span 
+                    className={cn(
+                        "transition-all duration-300 overflow-hidden whitespace-nowrap", 
+                        isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+                    )}
                 >
-                    <Link href={`/dashboard/${team.slug}`}>
-                        <Users className="mr-2 h-4 w-4" /> {team.name}
-                    </Link>
-                </Button>
-            ))}
+                    {label}
+                </span>
+            </Link>
+        </Button>
+     );
+
+     if (isCollapsed) {
+       return (
+         <TooltipProvider delayDuration={0}>
+           <Tooltip>
+             <TooltipTrigger asChild>
+               {ButtonContent}
+             </TooltipTrigger>
+             <TooltipContent side="right">
+               {label}
+             </TooltipContent>
+           </Tooltip>
+         </TooltipProvider>
+       );
+     }
+     
+     return ButtonContent;
+  };
+
+  return (
+      <aside className={cn(
+          "border-r border-border bg-card flex flex-col transition-all duration-300",
+          isCollapsed ? "w-[70px]" : "w-64"
+      )}>
+        {/* Header */}
+        <div className={cn("flex items-center h-16 px-4", isCollapsed ? "justify-center" : "justify-between")}>
+             <div className="flex items-center gap-2">
+                <div className="h-8 w-8 bg-accent rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-accent/20">L</div>
+                {!isCollapsed && <span className="font-bold text-lg tracking-tight text-foreground">Loophole</span>}
+             </div>
+             
+             {!isCollapsed && (
+                 <Button variant="ghost" size="icon" onClick={toggleSidebar} className="h-6 w-6 text-muted-foreground hover:text-foreground">
+                    <ChevronLeft className="h-4 w-4" />
+                 </Button>
+             )}
+        </div>
+
+        {/* Collapsed Toggle if closed */}
+        {isCollapsed && (
+            <div className="px-2 mb-4 flex justify-center">
+                 <Button variant="ghost" size="icon" onClick={toggleSidebar} className="h-6 w-6 text-muted-foreground hover:text-foreground">
+                    <ChevronRight className="h-4 w-4" />
+                 </Button>
+            </div>
+        )}
+        
+        <nav className="flex-1 px-3 py-4 space-y-6 overflow-hidden">
+          {/* Main Group */}
+          <div className="flex flex-col">
+            {!isCollapsed && <div className="px-2 mb-2 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest whitespace-nowrap transition-opacity duration-300">Platform</div>}
+            <NavItem 
+                href="/dashboard" 
+                icon={Box} 
+                label="My Tunnels" 
+                isActive={pathname === '/dashboard'} 
+            />
+            <NavItem 
+                href="/community" 
+                icon={Globe} 
+                label="Community" 
+                isActive={pathname === '/community'} 
+            />
           </div>
-          
-          <div className="pt-2">
-             <CreateTeamDialog onTeamCreated={fetchTeams} />
+
+          {/* Teams Group */}
+          <div className="flex flex-col">
+             {!isCollapsed && (
+                 <div className="px-2 mb-3 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest whitespace-nowrap transition-opacity duration-300">
+                    Teams
+                 </div>
+             )}
+
+             {/* Create Team Button - positioned here for both states */}
+             <div className="mb-2">
+                <CreateTeamDialog onTeamCreated={() => window.location.reload()}>
+                    {isCollapsed ? (
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="w-10 h-10 mx-auto text-muted-foreground hover:bg-secondary hover:text-foreground mb-1 flex justify-center items-center"
+                        >
+                            <Plus className="h-5 w-5" />
+                        </Button>
+                    ) : (
+                        <Button variant="outline" size="sm" className="w-full justify-start text-xs border-dashed gap-2 text-muted-foreground hover:text-foreground hover:bg-secondary hover:border-border">
+                            <Plus className="h-3 w-3" /> Create Team
+                        </Button>
+                    )}
+                </CreateTeamDialog>
+             </div>
+             
+             <div className="space-y-1 flex flex-col">
+                {teams.map(team => (
+                    <NavItem 
+                        key={team.id}
+                        href={`/dashboard/${team.slug}`}
+                        icon={Users}
+                        label={team.name}
+                        isActive={pathname === `/dashboard/${team.slug}`}
+                    />
+                ))}
+             </div>
           </div>
         </nav>
 
-        <div className="mt-auto border-t border-slate-800 pt-4 px-2">
-             <Button variant="ghost" asChild className={`w-full justify-start ${pathname === '/dashboard/settings' ? 'text-white bg-slate-800' : 'text-slate-500 hover:text-slate-300'}`}>
-                <Link href="/dashboard/settings">
-                    <Settings className="mr-2 h-4 w-4" /> Settings
-                </Link>
-             </Button>
+        {/* Footer */}
+        <div className="p-3 border-t border-border mt-auto flex flex-col">
+             <NavItem 
+                href="/dashboard/settings" 
+                icon={Settings} 
+                label="Settings" 
+                isActive={pathname === '/dashboard/settings'} 
+            />
         </div>
       </aside>
   );

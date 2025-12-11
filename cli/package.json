@@ -25,6 +25,8 @@
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
     "dotenv": "^16.4.7",
+    "get-port": "^7.1.0",
+    "http-proxy": "^1.18.1",
     "inquirer": "^13.0.2",
     "localtunnel": "^2.0.2",
     "open": "^11.0.0",

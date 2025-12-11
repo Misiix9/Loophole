@@ -16,19 +16,18 @@ import { Label } from "@/components/ui/label"
 import { createClient } from "@/utils/supabase/client"
 import { Plus } from "lucide-react"
 
-export function CreateTeamDialog({ onTeamCreated }: { onTeamCreated: () => void }) {
+export function CreateTeamDialog({ onTeamCreated, children }: { onTeamCreated: () => void, children?: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [slug, setSlug] = useState("")
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
-
+// ... existing logic ...
   const handleCreate = async () => {
+    // ... existing logic ...
     setLoading(true)
     try {
-        // 1. Get current user
         const { data: { user } } = await supabase.auth.getUser()
-        // Mock user for Phase 4 dev if not logged in (RLS will fail if not actually logged in, but for UI demo it's fine)
         const userId = user?.id
 
         if (!userId) {
@@ -49,7 +48,6 @@ export function CreateTeamDialog({ onTeamCreated }: { onTeamCreated: () => void 
         
         if (teamError) throw teamError
 
-        // Add creator as admin member
         const { error: memberError } = await supabase
             .from('team_members')
             .insert({
@@ -59,7 +57,6 @@ export function CreateTeamDialog({ onTeamCreated }: { onTeamCreated: () => void 
             })
         
         if (memberError) {
-            // Ideally rollback team creation, but for now just warn
             console.error("Failed to add member:", memberError)
             alert("Team created but failed to join as member. Please contact support.")
         }
@@ -78,14 +75,16 @@ export function CreateTeamDialog({ onTeamCreated }: { onTeamCreated: () => void 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="w-full justify-start text-xs border-dashed gap-2">
-            <Plus className="h-3 w-3" /> Create Team
-        </Button>
+        {children ? children : (
+            <Button variant="outline" size="sm" className="w-full justify-start text-xs border-dashed gap-2">
+                <Plus className="h-3 w-3" /> Create Team
+            </Button>
+        )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-800 text-white">
+      <DialogContent className="sm:max-w-[425px] bg-background border-border text-foreground shadow-2xl">
         <DialogHeader>
           <DialogTitle>Create Team</DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-muted-foreground">
             Create a new workspace for your team.
           </DialogDescription>
         </DialogHeader>
@@ -101,7 +100,7 @@ export function CreateTeamDialog({ onTeamCreated }: { onTeamCreated: () => void 
                   setName(e.target.value)
                   setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-'))
               }}
-              className="col-span-3 bg-slate-950 border-slate-800"
+              className="col-span-3 bg-secondary/30 border-border focus:border-accent"
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -112,12 +111,12 @@ export function CreateTeamDialog({ onTeamCreated }: { onTeamCreated: () => void 
               id="slug"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
-              className="col-span-3 bg-slate-950 border-slate-800"
+              className="col-span-3 bg-secondary/30 border-border focus:border-accent"
             />
           </div>
         </div>
         <DialogFooter>
-          <Button type="submit" onClick={handleCreate} disabled={loading} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Button type="submit" onClick={handleCreate} disabled={loading} className="bg-accent hover:bg-accent/90 text-white shadow-lg shadow-accent/20">
             {loading ? "Creating..." : "Create Team"}
           </Button>
         </DialogFooter>
