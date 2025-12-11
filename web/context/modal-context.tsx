@@ -66,12 +66,15 @@ function ModalContent({ type, onClose }: { type: ModalType; onClose: () => void 
             className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-black border border-white/10 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
         >
-            <button onClick={onClose} className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-white transition-colors z-20">
-                <X size={20} />
-            </button>
+            {type !== "username_setup" && (
+                <button onClick={onClose} className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-white transition-colors z-20">
+                    <X size={20} />
+                </button>
+            )}
 
             {type === "auth" && <AuthModalContent view="auth" />}
             {type === "plan_selection" && <AuthModalContent view="plan" />}
+            {type === "username_setup" && <AuthModalContent view="username" />}
         </motion.div>
     )
 }

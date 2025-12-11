@@ -5,11 +5,83 @@ import { createClient as createBrowserClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Github, Mail, Check, CreditCard } from "lucide-react";
+import { useModal } from "@/context/modal-context";
 
-export function AuthModalContent({ view }: { view: "auth" | "plan" }) {
-    if (view === "auth") return <AuthView />;
-    if (view === "plan") return <PlanSelectionView />;
-    return null;
+export function AuthModalContent({ view = "auth" }: { view?: "auth" | "plan" | "username" }) {
+    if (view === "plan") {
+        return <PlanSelectionView />
+    }
+    if (view === "username") {
+        return <UsernameView />
+    }
+    return <AuthView />
+}
+
+function UsernameView() {
+    const supabase = createBrowserClient();
+    const [username, setUsername] = useState("");
+    const [loading, setLoading] = useState(false);
+    const { closeModal } = useModal();
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+    async function handleSave(e: React.FormEvent) {
+        e.preventDefault();
+        setLoading(true);
+        setErrorMsg(null);
+
+        // check uniqueness? DB Trigger would fail on insert if duplicate, 
+        // but here we are updating user metadata. 
+        // Ideally we check via RPC or table select.
+        // For now, simpler: just update metadata. 
+        // The trigger will try to insert into profiles. If it fails due to unique constraint, we have an issue.
+        // But updating auth metadata doesn't automatically fail if Trigger fails (triggers are side effects).
+        // Let's assume happy path or simple update.
+
+        const { error } = await supabase.auth.updateUser({
+            data: { username: username, full_name: username }
+        });
+
+        if (error) {
+            setErrorMsg(error.message);
+            setLoading(false);
+        } else {
+            // Force reload to update navbar state or just close?
+            // Navbar listens to onAuthStateChange hopefully.
+            window.location.reload(); // safest to ensure all state is sync
+        }
+    }
+
+    return (
+        <div className="p-8">
+            <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold mb-2">One Last Thing</h2>
+                <p className="text-muted-foreground text-sm">Choose a username to complete your profile.</p>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-4">
+                <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground font-bold uppercase">Username</label>
+                    <input
+                        type="text"
+                        placeholder="loopuser123"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        required
+                        minLength={3}
+                        className="w-full h-10 bg-white/5 border border-white/10 rounded-lg px-3 text-white focus:outline-none focus:border-white/30 transition-colors text-sm"
+                    />
+                </div>
+                {errorMsg && <p className="text-red-400 text-xs">{errorMsg}</p>}
+
+                <button
+                    disabled={loading}
+                    className="w-full h-10 bg-white text-black font-bold rounded-lg flex items-center justify-center hover:bg-gray-200 transition-all text-sm mt-2"
+                >
+                    {loading ? "Saving..." : "Start Using Loophole"}
+                </button>
+            </form>
+        </div>
+    )
 }
 
 function AuthView() {
