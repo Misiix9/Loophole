@@ -28,7 +28,7 @@ export default function CommunityPage() {
       const { data, error } = await supabase
         .from('tunnels')
         .select('*')
-        .eq('is_public', true)
+        // .eq('is_public', true) // Backend column missing, temporarily disabled
         .eq('status', 'online')
         .order('created_at', { ascending: false });
 
