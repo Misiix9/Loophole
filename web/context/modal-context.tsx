@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 
-type ModalType = "auth" | "plan_selection" | null;
+type ModalType = "auth" | "plan_selection" | "username_setup" | null;
 
 interface ModalContextType {
     openModal: (type: ModalType) => void;
