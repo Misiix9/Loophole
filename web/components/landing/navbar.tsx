@@ -104,8 +104,10 @@ export function Navbar() {
                                     {user.user_metadata?.avatar_url ? (
                                         <Image src={user.user_metadata.avatar_url} alt="Profile" width={32} height={32} className="rounded-full border border-white/10" />
                                     ) : (
-                                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
-                                            <UserIcon size={16} />
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center border border-white/10">
+                                            <span className="text-xs font-bold text-white">
+                                                {(user.user_metadata?.full_name || user.user_metadata?.username || user.email?.charAt(0) || "U").charAt(0).toUpperCase()}
+                                            </span>
                                         </div>
                                     )}
                                     <span className="text-muted-foreground group-hover:text-white transition-colors">

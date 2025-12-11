@@ -11,7 +11,8 @@ create policy "Users can update own profile."
   on profiles for update
   using(auth.uid() = id);
 
-    create policy "Public profiles are viewable by everyone."
+    drop policy if exists "Public profiles are viewable by everyone." on profiles;
+create policy "Public profiles are viewable by everyone."
   on profiles for select
   using(true);
 
@@ -45,3 +46,22 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
 for each row execute procedure public.handle_new_user();
+
+--6. STORAGE BUCKET FOR AVATARS
+--Run this in the Supabase Dashboard > Storage > Create bucket
+--Bucket name: avatars
+--Public bucket: YES(enable public access)
+-- 
+--Or run this SQL if you have storage admin access:
+--insert into storage.buckets(id, name, public)
+--values('avatars', 'avatars', true);
+
+--Storage policy for authenticated uploads
+--Go to Storage > Policies and add:
+--Policy name: "Users can upload avatars"
+--Allowed operation: INSERT
+--Policy definition: (bucket_id = 'avatars') AND(auth.uid() IS NOT NULL)
+
+--Policy name: "Public avatar access"
+--Allowed operation: SELECT
+--Policy definition: (bucket_id = 'avatars')

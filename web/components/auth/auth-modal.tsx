@@ -363,7 +363,9 @@ function SettingsView() {
     const supabase = createBrowserClient();
     const [username, setUsername] = useState("");
     const [displayName, setDisplayName] = useState("");
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [saved, setSaved] = useState(false);
     const { closeModal } = useModal();
 
@@ -374,10 +376,54 @@ function SettingsView() {
             if (data.user) {
                 setUsername(data.user.user_metadata?.username || "");
                 setDisplayName(data.user.user_metadata?.full_name || "");
+                setAvatarUrl(data.user.user_metadata?.avatar_url || null);
             }
         }
         load();
     }, [supabase]);
+
+    async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploading(true);
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // Upload to Supabase Storage
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+            const filePath = `avatars/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file, { upsert: true });
+
+            if (uploadError) {
+                console.error('Upload error:', uploadError);
+                setUploading(false);
+                return;
+            }
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            // Update user metadata
+            await supabase.auth.updateUser({
+                data: { avatar_url: publicUrl }
+            });
+
+            setAvatarUrl(publicUrl);
+        } catch (error) {
+            console.error('Avatar upload failed:', error);
+        }
+
+        setUploading(false);
+    }
 
     async function handleSave(e: React.FormEvent) {
         e.preventDefault();
@@ -399,6 +445,44 @@ function SettingsView() {
             <div className="text-center mb-8">
                 <h2 className="text-2xl font-bold mb-2">Settings</h2>
                 <p className="text-muted-foreground text-sm">Manage your account settings</p>
+            </div>
+
+            {/* Profile Picture */}
+            <div className="flex flex-col items-center mb-6">
+                <div className="relative group">
+                    {avatarUrl ? (
+                        <img
+                            src={avatarUrl}
+                            alt="Profile"
+                            className="w-20 h-20 rounded-full border-2 border-white/10 object-cover"
+                        />
+                    ) : (
+                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-accent/50 to-purple-600/50 flex items-center justify-center border-2 border-white/10">
+                            <span className="text-2xl font-bold text-white">
+                                {(displayName || username || "U").charAt(0).toUpperCase()}
+                            </span>
+                        </div>
+                    )}
+                    <label
+                        htmlFor="avatar-upload"
+                        className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    >
+                        {uploading ? (
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        ) : (
+                            <span className="text-xs font-bold text-white">Change</span>
+                        )}
+                    </label>
+                    <input
+                        id="avatar-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarUpload}
+                        className="hidden"
+                        disabled={uploading}
+                    />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">Click to change photo</p>
             </div>
 
             <form onSubmit={handleSave} className="space-y-4">
