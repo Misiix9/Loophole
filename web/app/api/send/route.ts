@@ -1,14 +1,14 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || 're_mock_key');
 
 export async function POST(request: Request) {
   try {
     const { email, projectName, senderName, link } = await request.json();
 
     if (!process.env.RESEND_API_KEY) {
-        console.log("Mock Email Sent:", { email, projectName, link });
-        return Response.json({ success: true, mock: true });
+      console.log("Mock Email Sent:", { email, projectName, link });
+      return Response.json({ success: true, mock: true });
     }
 
     const { data, error } = await resend.emails.send({
