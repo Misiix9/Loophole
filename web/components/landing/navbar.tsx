@@ -98,8 +98,7 @@ export function Navbar() {
 
                             {/* User Menu Dropdown */}
                             <div className="relative group">
-                                <Link
-                                    href="/dashboard"
+                                <div
                                     className="hidden sm:flex items-center gap-3 text-sm font-medium py-2 cursor-pointer transition-opacity hover:opacity-80"
                                 >
                                     {user.user_metadata?.avatar_url ? (
@@ -112,20 +111,23 @@ export function Navbar() {
                                     <span className="text-muted-foreground group-hover:text-white transition-colors">
                                         {user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split('@')[0]}
                                     </span>
-                                </Link>
+                                </div>
 
                                 {/* Dropdown */}
                                 <div className="absolute top-full right-0 pt-2 w-48 opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out z-50">
                                     <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl p-1">
-                                        <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-                                            <span>Dashboard</span>
-                                        </Link>
-                                        <Link href="/dashboard/settings" className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-                                            <span>Settings</span>
-                                        </Link>
-                                        <Link href="/dashboard/billing" className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-                                            <span>Billing</span>
-                                        </Link>
+                                        <button
+                                            onClick={() => openModal('settings')}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                                        >
+                                            Settings
+                                        </button>
+                                        <button
+                                            onClick={() => openModal('billing')}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                                        >
+                                            Billing
+                                        </button>
                                         <div className="h-px bg-white/10 my-1 mx-2" />
                                         <button
                                             onClick={async () => {

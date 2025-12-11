@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 
-type ModalType = "auth" | "plan_selection" | "username_setup" | null;
+type ModalType = "auth" | "plan_selection" | "username_setup" | "settings" | "billing" | null;
 
 interface ModalContextType {
     openModal: (type: ModalType) => void;
@@ -75,6 +75,8 @@ function ModalContent({ type, onClose }: { type: ModalType; onClose: () => void 
             {type === "auth" && <AuthModalContent view="auth" />}
             {type === "plan_selection" && <AuthModalContent view="plan" />}
             {type === "username_setup" && <AuthModalContent view="username" />}
+            {type === "settings" && <AuthModalContent view="settings" />}
+            {type === "billing" && <AuthModalContent view="billing" />}
         </motion.div>
     )
 }

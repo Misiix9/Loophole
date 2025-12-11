@@ -1,18 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Github, Mail, Check, CreditCard } from "lucide-react";
 import { useModal } from "@/context/modal-context";
 
-export function AuthModalContent({ view = "auth" }: { view?: "auth" | "plan" | "username" }) {
+export function AuthModalContent({ view = "auth" }: { view?: "auth" | "plan" | "username" | "settings" | "billing" }) {
     if (view === "plan") {
         return <PlanSelectionView />
     }
     if (view === "username") {
         return <UsernameView />
+    }
+    if (view === "settings") {
+        return <SettingsView />
+    }
+    if (view === "billing") {
+        return <BillingView />
     }
     return <AuthView />
 }
@@ -351,4 +357,157 @@ function PlanSelectionView() {
 
 function Spinner() {
     return <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+}
+
+function SettingsView() {
+    const supabase = createBrowserClient();
+    const [username, setUsername] = useState("");
+    const [displayName, setDisplayName] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const { closeModal } = useModal();
+
+    // Fetch current user data on mount
+    useEffect(() => {
+        async function load() {
+            const { data } = await supabase.auth.getUser();
+            if (data.user) {
+                setUsername(data.user.user_metadata?.username || "");
+                setDisplayName(data.user.user_metadata?.full_name || "");
+            }
+        }
+        load();
+    }, [supabase]);
+
+    async function handleSave(e: React.FormEvent) {
+        e.preventDefault();
+        setLoading(true);
+
+        const { error } = await supabase.auth.updateUser({
+            data: { username, full_name: displayName }
+        });
+
+        setLoading(false);
+        if (!error) {
+            setSaved(true);
+            setTimeout(() => setSaved(false), 2000);
+        }
+    }
+
+    return (
+        <div className="p-8">
+            <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold mb-2">Settings</h2>
+                <p className="text-muted-foreground text-sm">Manage your account settings</p>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-4">
+                <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground font-bold uppercase">Username</label>
+                    <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="w-full h-10 bg-white/5 border border-white/10 rounded-lg px-3 text-white focus:outline-none focus:border-white/30 transition-colors text-sm"
+                    />
+                </div>
+
+                <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground font-bold uppercase">Display Name</label>
+                    <input
+                        type="text"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        className="w-full h-10 bg-white/5 border border-white/10 rounded-lg px-3 text-white focus:outline-none focus:border-white/30 transition-colors text-sm"
+                    />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                    <button
+                        type="button"
+                        onClick={closeModal}
+                        className="flex-1 h-10 bg-white/5 border border-white/10 text-white font-bold rounded-lg hover:bg-white/10 transition-all text-sm"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="flex-1 h-10 bg-white text-black font-bold rounded-lg flex items-center justify-center hover:bg-gray-200 transition-all text-sm"
+                    >
+                        {loading ? "Saving..." : saved ? "Saved!" : "Save Changes"}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+}
+
+function BillingView() {
+    const [loading, setLoading] = useState(false);
+    const { closeModal } = useModal();
+
+    async function handleManageBilling() {
+        setLoading(true);
+        // Redirect to Stripe Customer Portal or billing management
+        window.location.href = '/api/billing/portal';
+    }
+
+    async function handleUpgrade(plan: 'creator' | 'startup') {
+        setLoading(true);
+        window.location.href = `/api/checkout?plan=${plan}&setup=true`;
+    }
+
+    return (
+        <div className="p-8">
+            <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold mb-2">Billing</h2>
+                <p className="text-muted-foreground text-sm">Manage your subscription and billing</p>
+            </div>
+
+            <div className="space-y-4">
+                <div className="p-4 rounded-xl border border-white/10 bg-white/5">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <div className="font-bold">Current Plan</div>
+                            <div className="text-sm text-muted-foreground">Hobby (Free)</div>
+                        </div>
+                        <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded">Active</span>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground font-bold uppercase">Upgrade</div>
+                    <button
+                        onClick={() => handleUpgrade('creator')}
+                        className="w-full flex items-center justify-between p-4 rounded-xl border border-accent/50 bg-accent/5 hover:bg-accent/10 transition-all text-left"
+                    >
+                        <div>
+                            <div className="font-bold">Creator</div>
+                            <div className="text-xs text-muted-foreground">$9/month</div>
+                        </div>
+                        <CreditCard size={18} className="text-accent" />
+                    </button>
+                    <button
+                        onClick={() => handleUpgrade('startup')}
+                        className="w-full flex items-center justify-between p-4 rounded-xl border border-white/10 hover:bg-white/5 transition-all text-left"
+                    >
+                        <div>
+                            <div className="font-bold">Startup</div>
+                            <div className="text-xs text-muted-foreground">$29/month</div>
+                        </div>
+                        <CreditCard size={18} className="text-muted-foreground" />
+                    </button>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={closeModal}
+                    className="w-full h-10 bg-white/5 border border-white/10 text-white font-bold rounded-lg hover:bg-white/10 transition-all text-sm mt-4"
+                >
+                    Close
+                </button>
+            </div>
+        </div>
+    );
 }
