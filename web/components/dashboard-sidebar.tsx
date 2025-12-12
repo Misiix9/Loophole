@@ -110,7 +110,8 @@ export function DashboardSidebar() {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    const client = createClient();
+    await client.auth.signOut();
     window.location.href = '/';
   };
 

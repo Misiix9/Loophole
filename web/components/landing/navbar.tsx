@@ -8,7 +8,7 @@ import { MagneticButton } from "@/components/ui/magnetic-button";
 import { useModal } from "@/context/modal-context";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { Crown, Loader2 } from "lucide-react";
+import { Crown, Loader2, LogOut } from "lucide-react";
 import { PLANS, PlanTier } from "@/lib/plans";
 
 interface Profile {
@@ -32,83 +32,17 @@ export function Navbar() {
     });
 
     useEffect(() => {
+        let isMounted = true;
         const supabase = createBrowserClient();
 
-        const checkUser = async () => {
+        const init = async () => {
             try {
-                const { data: { user }, error } = await supabase.auth.getUser();
+                // Get current session
+                const { data: { session } } = await supabase.auth.getSession();
 
-                if (error) {
-                    console.log("Auth error:", error);
-                    setUser(null);
-                    setLoading(false);
-                    return;
-                }
+                if (!isMounted) return;
 
-                setUser(user);
-
-                if (user) {
-                    // Fetch profile from database
-                    try {
-                        const { data: profileData, error: profileError } = await supabase
-                            .from('profiles')
-                            .select('id, has_selected_plan, plan_tier')
-                            .eq('id', user.id)
-                            .single();
-
-                        console.log("Profile data fetched:", profileData, "Error:", profileError);
-
-                        if (profileError || !profileData) {
-                            // Create profile if it doesn't exist
-                            console.log("Creating new profile for user:", user.id);
-                            await supabase.from('profiles').upsert({
-                                id: user.id,
-                                email: user.email,
-                                display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
-                                avatar_url: user.user_metadata?.avatar_url || '',
-                                username: user.user_metadata?.username || null,
-                                plan_tier: 'hobby',
-                                has_selected_plan: false,
-                                subscription_status: 'active',
-                                updated_at: new Date().toISOString()
-                            }, { onConflict: 'id' });
-
-                            // Set default profile
-                            setProfile({ id: user.id, plan_tier: 'hobby', has_selected_plan: false });
-                            openModal("plan_selection");
-                        } else {
-                            console.log("Setting profile:", profileData);
-                            setProfile(profileData);
-
-                            if (!profileData.has_selected_plan) {
-                                openModal("plan_selection");
-                            } else if (!user.user_metadata?.username) {
-                                openModal("username_setup");
-                            }
-                        }
-                    } catch (profileErr) {
-                        console.error("Error fetching profile:", profileErr);
-                        // Set default profile on error
-                        setProfile({ id: user.id, plan_tier: 'hobby', has_selected_plan: false });
-                    }
-                }
-            } catch (err) {
-                console.error("Error checking user:", err);
-            } finally {
-                // Always set loading to false
-                setLoading(false);
-            }
-        };
-
-        // Initial check
-        checkUser();
-
-        // Listen for auth state changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                console.log("Auth state change:", event, session?.user?.email);
-
-                if (event === 'SIGNED_IN' && session?.user) {
+                if (session?.user) {
                     setUser(session.user);
 
                     // Fetch profile
@@ -118,64 +52,60 @@ export function Navbar() {
                         .eq('id', session.user.id)
                         .single();
 
-                    console.log("Profile after sign in:", profileData);
-
-                    if (profileData) {
+                    if (profileData && isMounted) {
                         setProfile(profileData);
-                    } else {
-                        // Create profile for new user
-                        await supabase.from('profiles').upsert({
-                            id: session.user.id,
-                            email: session.user.email,
-                            display_name: session.user.user_metadata?.full_name || '',
-                            avatar_url: session.user.user_metadata?.avatar_url || '',
-                            plan_tier: 'hobby',
-                            has_selected_plan: false,
-                            subscription_status: 'active',
-                            updated_at: new Date().toISOString()
-                        }, { onConflict: 'id' });
-
-                        setProfile({ id: session.user.id, plan_tier: 'hobby', has_selected_plan: false });
-                        openModal("plan_selection");
                     }
-
-                    setLoading(false);
-                } else if (event === 'SIGNED_OUT') {
-                    setUser(null);
-                    setProfile(null);
+                }
+            } catch (err) {
+                console.error("Init error:", err);
+            } finally {
+                if (isMounted) {
                     setLoading(false);
                 }
+            }
+        };
+
+        init();
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                if (!isMounted) return;
+
+                if (session?.user) {
+                    setUser(session.user);
+
+                    const { data: profileData } = await supabase
+                        .from('profiles')
+                        .select('id, has_selected_plan, plan_tier')
+                        .eq('id', session.user.id)
+                        .single();
+
+                    if (profileData && isMounted) {
+                        setProfile(profileData);
+                    }
+                } else {
+                    setUser(null);
+                    setProfile(null);
+                }
+
+                setLoading(false);
             }
         );
 
         return () => {
+            isMounted = false;
             subscription.unsubscribe();
         };
-    }, [openModal]);
+    }, []);
 
     const handleSignOut = async () => {
-        try {
-            setSigningOut(true);
-            const supabase = createBrowserClient();
-
-            const { error } = await supabase.auth.signOut();
-
-            if (error) {
-                console.error("Sign out error:", error);
-                setSigningOut(false);
-                return;
-            }
-
-            // Clear local state
-            setUser(null);
-            setProfile(null);
-
-            // Force redirect to home page
-            window.location.href = '/';
-        } catch (err) {
-            console.error("Error during sign out:", err);
-            setSigningOut(false);
-        }
+        setSigningOut(true);
+        const supabase = createBrowserClient();
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        window.location.href = '/';
     };
 
     const currentPlan = profile?.plan_tier || 'hobby';
@@ -229,7 +159,7 @@ export function Navbar() {
 
                 <nav className="hidden md:flex items-center gap-6 mx-8">
                     {["Features", "Pricing", "About"].map((item) => (
-                        <Link key={item} href={`#${item.toLowerCase()} `} className="text-sm font-medium text-muted-foreground hover:text-white transition-colors relative group">
+                        <Link key={item} href={`#${item.toLowerCase()}`} className="text-sm font-medium text-muted-foreground hover:text-white transition-colors relative group">
                             {item}
                             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-accent transition-all group-hover:w-full"></span>
                         </Link>
@@ -238,38 +168,31 @@ export function Navbar() {
 
                 <div className="flex items-center gap-4">
                     {loading ? (
-                        // Show loading spinner while checking auth
                         <div className="flex items-center justify-center w-[100px]">
                             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                         </div>
                     ) : user ? (
                         <div className="flex items-center gap-4 animate-in fade-in duration-500">
-
                             {/* User Menu Dropdown */}
                             <div className="relative group">
-                                <div
-                                    className="hidden sm:flex items-center gap-3 text-sm font-medium py-2 cursor-pointer transition-opacity hover:opacity-80"
-                                >
+                                <div className="hidden sm:flex items-center gap-3 text-sm font-medium py-2 cursor-pointer transition-opacity hover:opacity-80">
                                     {user.user_metadata?.avatar_url ? (
                                         <img
                                             src={user.user_metadata.avatar_url}
                                             alt="Profile"
-                                            width={32}
-                                            height={32}
                                             className="w-8 h-8 rounded-full border border-white/10 object-cover"
                                         />
                                     ) : (
                                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center border border-white/10">
                                             <span className="text-xs font-bold text-white">
-                                                {(user.user_metadata?.full_name || user.user_metadata?.username || user.email?.charAt(0) || "U").charAt(0).toUpperCase()}
+                                                {(user.user_metadata?.full_name || user.email?.charAt(0) || "U").charAt(0).toUpperCase()}
                                             </span>
                                         </div>
                                     )}
                                     <div className="flex flex-col">
                                         <span className="text-muted-foreground group-hover:text-white transition-colors">
-                                            {user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split('@')[0]}
+                                            {user.user_metadata?.full_name || user.email?.split('@')[0]}
                                         </span>
-                                        {/* Show current plan */}
                                         <span className="text-[10px] text-accent flex items-center gap-1">
                                             {currentPlan !== 'hobby' && <Crown size={10} />}
                                             {currentPlanConfig.name}
@@ -304,7 +227,10 @@ export function Navbar() {
                                                     Signing out...
                                                 </>
                                             ) : (
-                                                'Sign Out'
+                                                <>
+                                                    <LogOut className="h-4 w-4" />
+                                                    Sign Out
+                                                </>
                                             )}
                                         </button>
                                     </div>
