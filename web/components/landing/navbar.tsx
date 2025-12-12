@@ -18,9 +18,7 @@ export function Navbar() {
     const [loading, setLoading] = useState(true);
 
     useMotionValueEvent(scrollY, "change", (latest) => {
-        if (latest > 50 && !isScrolled) setIsScrolled(teling service like auto - reconnect, request logging, default port, API key management, etc.
-        
-        Go to / dashboard / settings to see the new page!rue);
+        if (latest > 50 && !isScrolled) setIsScrolled(true);
         if (latest <= 50 && isScrolled) setIsScrolled(false);
     });
 
