@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { NextResponse } from 'next/server';
 
 export interface UserData {
@@ -21,8 +22,9 @@ export async function GET() {
             return NextResponse.json({ user: null });
         }
 
-        // Fetch profile from database
-        const { data: profile, error: profileError } = await supabase
+        // Fetch profile from database using ADMIN client to bypass RLS
+        const adminSupabase = createAdminClient();
+        const { data: profile, error: profileError } = await adminSupabase
             .from('profiles')
             .select('username, display_name, avatar_url, plan_tier')
             .eq('id', user.id)

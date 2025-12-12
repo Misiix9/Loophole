@@ -63,14 +63,24 @@ export function Navbar() {
         return () => subscription.unsubscribe();
     }, [fetchUser]);
 
-    // Sign out handler
+    // Sign out handler - Instant
     const handleSignOut = useCallback(async () => {
+        // 1. Instant UI update
+        setUser(null);
         setSigningOut(true);
+
         try {
-            await fetch('/api/auth/signout', { method: 'POST' });
+            // 2. Server-side sign out (fire and forget with keepalive)
+            fetch('/api/auth/signout', {
+                method: 'POST',
+                keepalive: true
+            });
+
+            // 3. Client-side sign out (fire and forget)
             const supabase = createClient();
-            await supabase.auth.signOut();
-            setUser(null);
+            supabase.auth.signOut();
+
+            // 4. Redirect immediately
             window.location.href = '/';
         } catch (err) {
             console.error("Sign out error:", err);

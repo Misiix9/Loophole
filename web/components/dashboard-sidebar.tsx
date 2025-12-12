@@ -108,19 +108,24 @@ export function DashboardSidebar() {
   };
 
   const handleSignOut = async () => {
+    // 1. Instant UI update
+    setUserData(null);
+
     try {
-      // Call server-side sign out API for proper session clearing
-      await fetch('/api/auth/signout', { method: 'POST' });
+      // 2. Server-side sign out (fire and forget with keepalive)
+      fetch('/api/auth/signout', {
+        method: 'POST',
+        keepalive: true
+      });
 
-      // Also sign out client-side
+      // 3. Client-side sign out
       const client = createClient();
-      await client.auth.signOut();
+      client.auth.signOut();
 
-      // Redirect to home
+      // 4. Redirect immediately
       window.location.href = '/';
     } catch (err) {
       console.error('Sign out error:', err);
-      // Fallback: redirect anyway
       window.location.href = '/';
     }
   };
