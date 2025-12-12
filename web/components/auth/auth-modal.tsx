@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Github, Mail, Check, CreditCard } from "lucide-react";
+import { Github, Mail, Check, CreditCard, Sparkles, Crown, ArrowRight, Building, Zap, Shield, RefreshCw } from "lucide-react";
 import { useModal } from "@/context/modal-context";
 
 export function AuthModalContent({ view = "auth" }: { view?: "auth" | "plan" | "username" | "settings" | "billing" }) {
@@ -257,7 +257,6 @@ function AuthView() {
 
 function PlanSelectionView() {
     const [loading, setLoading] = useState<string | null>(null);
-    const router = useRouter();
 
     async function handleSelectPlan(plan: 'hobby' | 'creator' | 'startup') {
         const supabase = createBrowserClient();
@@ -285,47 +284,153 @@ function PlanSelectionView() {
     }
 
     return (
-        <div className="p-8">
+        <div className="p-6 sm:p-8">
+            {/* Header with gradient */}
             <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold mb-2">Choose your plan</h2>
-                <p className="text-muted-foreground text-sm">Select a plan to complete your setup.</p>
+                <div className="inline-flex items-center gap-2 bg-accent/10 text-accent px-3 py-1 rounded-full text-xs font-bold mb-4">
+                    <Sparkles size={14} />
+                    WELCOME TO LOOPHOLE
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold mb-2">Choose your plan</h2>
+                <p className="text-muted-foreground text-sm">Start free, upgrade anytime. Cancel with one click.</p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
-                {/* Hobby */}
-                <button
-                    onClick={() => handleSelectPlan('hobby')}
-                    className="flex items-center justify-between p-4 rounded-xl border border-white/10 hover:border-white/30 hover:bg-white/5 transition-all text-left group"
-                >
-                    <div>
-                        <div className="font-bold flex items-center gap-2">Hobby <span className="text-xs bg-white/10 px-2 py-0.5 rounded text-muted-foreground">Free</span></div>
-                        <div className="text-xs text-muted-foreground mt-1">Unlimited tunnels, basic features.</div>
-                    </div>
-                    <Check className="opacity-0 group-hover:opacity-100 transition-opacity text-emerald-500" />
-                </button>
-
-                {/* Creator */}
+            <div className="space-y-3">
+                {/* CREATOR - FEATURED/RECOMMENDED */}
                 <button
                     onClick={() => handleSelectPlan('creator')}
-                    className="flex items-center justify-between p-4 rounded-xl border border-accent/50 bg-accent/5 hover:bg-accent/10 transition-all text-left group relative overflow-hidden"
+                    disabled={!!loading}
+                    className="w-full relative p-5 rounded-2xl border-2 border-accent bg-gradient-to-br from-accent/20 via-accent/10 to-purple-600/10 hover:from-accent/30 hover:via-accent/15 hover:to-purple-600/15 transition-all text-left group overflow-hidden"
                 >
-                    <div className="relative z-10">
-                        <div className="font-bold flex items-center gap-2">Creator <span className="text-xs bg-accent text-white px-2 py-0.5 rounded">$9/mo</span></div>
-                        <div className="text-xs text-muted-foreground mt-1">Custom domains, password protection.</div>
+                    {/* Shimmer effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+
+                    {/* Popular badge */}
+                    <div className="absolute -top-px -right-px bg-accent text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl rounded-tr-2xl">
+                        MOST POPULAR
                     </div>
-                    {loading === 'creator' ? <Spinner /> : <CreditCard size={18} className="text-accent" />}
+
+                    <div className="relative z-10">
+                        <div className="flex items-start justify-between mb-3">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Crown size={18} className="text-accent" />
+                                    <span className="font-bold text-lg">Creator</span>
+                                </div>
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-3xl font-bold text-white">$9</span>
+                                    <span className="text-muted-foreground text-sm">/month</span>
+                                </div>
+                            </div>
+                            {loading === 'creator' ? (
+                                <Spinner />
+                            ) : (
+                                <ArrowRight size={20} className="text-accent opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                            )}
+                        </div>
+
+                        <p className="text-sm text-muted-foreground mb-4">Perfect for developers who need professional features.</p>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                            {[
+                                '3 Custom subdomains',
+                                '3 Concurrent tunnels',
+                                'Password protection',
+                                'TCP & WebSocket',
+                                'Request logging',
+                                'Priority support'
+                            ].map((feature) => (
+                                <div key={feature} className="flex items-center gap-1.5 text-white/80">
+                                    <Check size={12} className="text-accent shrink-0" />
+                                    <span>{feature}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </button>
 
-                {/* Startup */}
+                {/* STARTUP */}
                 <button
                     onClick={() => handleSelectPlan('startup')}
-                    className="flex items-center justify-between p-4 rounded-xl border border-white/10 hover:border-white/30 hover:bg-white/5 transition-all text-left group"
+                    disabled={!!loading}
+                    className="w-full p-5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/5 hover:border-white/20 transition-all text-left group"
                 >
-                    <div>
-                        <div className="font-bold flex items-center gap-2">Startup <span className="text-xs bg-white/10 px-2 py-0.5 rounded text-white">$29/mo</span></div>
-                        <div className="text-xs text-muted-foreground mt-1">Teams, SSO, Priority Support.</div>
+                    <div className="flex items-start justify-between mb-3">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <Building size={18} className="text-purple-400" />
+                                <span className="font-bold text-lg">Startup</span>
+                                <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full">TEAMS</span>
+                            </div>
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-3xl font-bold text-white">$29</span>
+                                <span className="text-muted-foreground text-sm">/month</span>
+                            </div>
+                        </div>
+                        {loading === 'startup' ? (
+                            <Spinner />
+                        ) : (
+                            <ArrowRight size={20} className="text-purple-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                        )}
+                    </div>
+
+                    <p className="text-sm text-muted-foreground mb-3">For teams building production applications.</p>
+
+                    <div className="flex flex-wrap gap-2 text-xs">
+                        {['5 Team members', '10 Custom subdomains', 'Audit logs', '99.9% SLA'].map((feature) => (
+                            <span key={feature} className="bg-white/5 text-white/70 px-2 py-1 rounded">{feature}</span>
+                        ))}
                     </div>
                 </button>
+
+                {/* Divider */}
+                <div className="relative py-3">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-white/10"></div>
+                    </div>
+                    <div className="relative flex justify-center">
+                        <span className="bg-black px-3 text-xs text-muted-foreground">or start free</span>
+                    </div>
+                </div>
+
+                {/* HOBBY - De-emphasized */}
+                <button
+                    onClick={() => handleSelectPlan('hobby')}
+                    disabled={!!loading}
+                    className="w-full p-4 rounded-xl border border-white/5 bg-transparent hover:bg-white/[0.02] hover:border-white/10 transition-all text-left group"
+                >
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                                <Zap size={14} className="text-muted-foreground" />
+                            </div>
+                            <div>
+                                <div className="font-medium text-sm text-muted-foreground">Hobby</div>
+                                <div className="text-xs text-muted-foreground/60">1 tunnel, random subdomain</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Free forever</span>
+                            {loading === 'hobby' ? (
+                                <Spinner />
+                            ) : (
+                                <ArrowRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            )}
+                        </div>
+                    </div>
+                </button>
+            </div>
+
+            {/* Trust badges */}
+            <div className="flex items-center justify-center gap-4 mt-6 text-[10px] text-muted-foreground/50">
+                <div className="flex items-center gap-1">
+                    <Shield size={10} />
+                    <span>Secure payments</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <RefreshCw size={10} />
+                    <span>Cancel anytime</span>
+                </div>
             </div>
         </div>
     )
