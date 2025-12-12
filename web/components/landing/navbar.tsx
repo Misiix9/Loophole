@@ -3,10 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { MagneticButton } from "@/components/ui/magnetic-button";
 import { useModal } from "@/context/modal-context";
-import { createClient as createBrowserClient } from "@/utils/supabase/client";
+import { createClient } from "@/utils/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Crown, Loader2, LogOut } from "lucide-react";
 import { PLANS, PlanTier } from "@/lib/plans";
@@ -33,32 +33,56 @@ export function Navbar() {
 
     useEffect(() => {
         let isMounted = true;
-        const supabase = createBrowserClient();
+        let timeoutId: NodeJS.Timeout;
 
         const init = async () => {
             try {
-                // Get current session
-                const { data: { session } } = await supabase.auth.getSession();
+                const supabase = createClient();
+
+                // Set a timeout to prevent infinite loading - 5 seconds max
+                timeoutId = setTimeout(() => {
+                    if (isMounted && loading) {
+                        console.log("Auth check timed out");
+                        setLoading(false);
+                    }
+                }, 5000);
+
+                // Get current session (faster than getUser)
+                const { data: { session }, error } = await supabase.auth.getSession();
 
                 if (!isMounted) return;
+
+                if (error) {
+                    console.error("Session error:", error);
+                    setLoading(false);
+                    return;
+                }
 
                 if (session?.user) {
                     setUser(session.user);
 
-                    // Fetch profile
-                    const { data: profileData } = await supabase
-                        .from('profiles')
-                        .select('id, has_selected_plan, plan_tier')
-                        .eq('id', session.user.id)
-                        .single();
+                    // Try to fetch profile, but don't block on it
+                    try {
+                        const { data: profileData } = await supabase
+                            .from('profiles')
+                            .select('id, has_selected_plan, plan_tier')
+                            .eq('id', session.user.id)
+                            .single();
 
-                    if (profileData && isMounted) {
-                        setProfile(profileData);
+                        if (profileData && isMounted) {
+                            setProfile(profileData);
+                        }
+                    } catch (profileErr) {
+                        console.error("Profile fetch error:", profileErr);
+                        // Continue without profile - will show default "Hobby"
                     }
+                }
+
+                if (isMounted) {
+                    setLoading(false);
                 }
             } catch (err) {
                 console.error("Init error:", err);
-            } finally {
                 if (isMounted) {
                     setLoading(false);
                 }
@@ -67,14 +91,19 @@ export function Navbar() {
 
         init();
 
-        // Listen for auth changes
+        // Also listen for auth state changes
+        const supabase = createClient();
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
                 if (!isMounted) return;
 
-                if (session?.user) {
-                    setUser(session.user);
+                console.log("Auth state changed:", event);
 
+                if (event === 'SIGNED_IN' && session?.user) {
+                    setUser(session.user);
+                    setLoading(false);
+
+                    // Fetch profile in background
                     const { data: profileData } = await supabase
                         .from('profiles')
                         .select('id, has_selected_plan, plan_tier')
@@ -84,29 +113,44 @@ export function Navbar() {
                     if (profileData && isMounted) {
                         setProfile(profileData);
                     }
-                } else {
+                } else if (event === 'SIGNED_OUT') {
                     setUser(null);
                     setProfile(null);
+                    setLoading(false);
                 }
-
-                setLoading(false);
             }
         );
 
         return () => {
             isMounted = false;
+            clearTimeout(timeoutId);
             subscription.unsubscribe();
         };
     }, []);
 
-    const handleSignOut = async () => {
-        setSigningOut(true);
-        const supabase = createBrowserClient();
-        await supabase.auth.signOut();
-        setUser(null);
-        setProfile(null);
-        window.location.href = '/';
-    };
+    const handleSignOut = useCallback(async () => {
+        try {
+            setSigningOut(true);
+            const supabase = createClient();
+
+            // Sign out from Supabase
+            const { error } = await supabase.auth.signOut();
+
+            if (error) {
+                console.error("Sign out error:", error);
+            }
+
+            // Clear state
+            setUser(null);
+            setProfile(null);
+
+            // Redirect to home
+            window.location.href = '/';
+        } catch (err) {
+            console.error("Sign out failed:", err);
+            setSigningOut(false);
+        }
+    }, []);
 
     const currentPlan = profile?.plan_tier || 'hobby';
     const currentPlanConfig = PLANS[currentPlan] || PLANS['hobby'];
