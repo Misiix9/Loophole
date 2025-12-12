@@ -621,19 +621,19 @@ function BillingView() {
 
     useEffect(() => {
         const fetchProfile = async () => {
-            const supabase = createBrowserClient();
-            const { data: { user } } = await supabase.auth.getUser();
+            try {
+                const res = await fetch('/api/auth/me');
+                const data = await res.json();
 
-            if (user) {
-                const { data } = await supabase
-                    .from('profiles')
-                    .select('plan_tier, subscription_status, stripe_subscription_id')
-                    .eq('id', user.id)
-                    .single();
-
-                if (data) {
-                    setProfile(data);
+                if (data.user) {
+                    setProfile({
+                        plan_tier: data.user.plan_tier,
+                        subscription_status: data.user.subscription_status || 'active',
+                        stripe_subscription_id: data.user.stripe_subscription_id || null
+                    });
                 }
+            } catch (err) {
+                console.error("Failed to fetch billing profile:", err);
             }
         };
         fetchProfile();
