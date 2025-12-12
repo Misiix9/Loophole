@@ -103,10 +103,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
     );
 }
 
-export function useUser() {
+export function useUser(): UserContextType {
     const context = useContext(UserContext);
     if (context === undefined) {
-        throw new Error("useUser must be used within a UserProvider");
+        // Return safe defaults if used outside provider (SSR or initial render)
+        return {
+            user: null,
+            profile: null,
+            loading: true,
+            refreshProfile: async () => { },
+            isLoggedIn: false,
+            currentPlan: 'hobby',
+        };
     }
     return context;
 }

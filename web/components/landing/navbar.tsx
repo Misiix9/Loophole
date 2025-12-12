@@ -6,57 +6,78 @@ import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import { useEffect, useState } from "react";
 import { MagneticButton } from "@/components/ui/magnetic-button";
 import { useModal } from "@/context/modal-context";
-import { useUser } from "@/context/user-context";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
+import { User } from "@supabase/supabase-js";
 import { Crown } from "lucide-react";
-import { PLANS } from "@/lib/plans";
+import { PLANS, PlanTier } from "@/lib/plans";
+
+interface Profile {
+    id: string;
+    plan_tier: PlanTier;
+    has_selected_plan: boolean;
+}
 
 export function Navbar() {
     const { scrollY } = useScroll();
     const [isScrolled, setIsScrolled] = useState(false);
     const { openModal } = useModal();
-    const { user, profile, loading, isLoggedIn, currentPlan, refreshProfile } = useUser();
+    const [user, setUser] = useState<User | null>(null);
+    const [profile, setProfile] = useState<Profile | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useMotionValueEvent(scrollY, "change", (latest) => {
         if (latest > 50 && !isScrolled) setIsScrolled(true);
         if (latest <= 50 && isScrolled) setIsScrolled(false);
     });
 
-    // Handle onboarding modals
     useEffect(() => {
-        if (!loading && user && profile) {
-            if (!profile.has_selected_plan) {
-                openModal("plan_selection");
-            } else if (!user?.user_metadata?.username) {
-                openModal("username_setup");
-            }
-        }
-    }, [loading, isLoggedIn, profile, user, openModal]);
+        const checkUser = async () => {
+            const supabase = createBrowserClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+            setLoading(false);
 
-    // Create profile if it doesn't exist
-    useEffect(() => {
-        const ensureProfile = async () => {
-            if (!loading && user && profile === null) {
-                const supabase = createBrowserClient();
-                await supabase.from('profiles').upsert({
-                    id: user.id,
-                    email: user.email,
-                    display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
-                    avatar_url: user.user_metadata?.avatar_url || '',
-                    username: user.user_metadata?.username || null,
-                    plan_tier: 'hobby',
-                    has_selected_plan: false,
-                    subscription_status: 'active',
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'id' });
+            if (user) {
+                // Check if profile exists and has selected a plan
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('id, has_selected_plan, plan_tier')
+                    .eq('id', user.id)
+                    .single();
 
-                await refreshProfile();
-                openModal("plan_selection");
+                if (!profileData) {
+                    // Create profile if it doesn't exist
+                    await supabase.from('profiles').upsert({
+                        id: user.id,
+                        email: user.email,
+                        display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+                        avatar_url: user.user_metadata?.avatar_url || '',
+                        username: user.user_metadata?.username || null,
+                        plan_tier: 'hobby',
+                        has_selected_plan: false,
+                        subscription_status: 'active',
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'id' });
+
+                    // New user - show plan selection modal
+                    openModal("plan_selection");
+                } else {
+                    setProfile(profileData);
+
+                    if (!profileData.has_selected_plan) {
+                        // Existing user who hasn't selected a plan yet
+                        openModal("plan_selection");
+                    } else if (!user.user_metadata?.username) {
+                        // Plan selected but no username - show username setup
+                        openModal("username_setup");
+                    }
+                }
             }
         };
-        ensureProfile();
-    }, [loading, user, profile, refreshProfile, openModal]);
+        checkUser();
+    }, [openModal]);
 
+    const currentPlan = profile?.plan_tier || 'hobby';
     const currentPlanConfig = PLANS[currentPlan] || PLANS['hobby'];
 
     return (
@@ -123,7 +144,7 @@ export function Navbar() {
                                 <div
                                     className="hidden sm:flex items-center gap-3 text-sm font-medium py-2 cursor-pointer transition-opacity hover:opacity-80"
                                 >
-                                    {user?.user_metadata?.avatar_url ? (
+                                    {user.user_metadata?.avatar_url ? (
                                         <img
                                             src={user.user_metadata.avatar_url}
                                             alt="Profile"
@@ -134,13 +155,13 @@ export function Navbar() {
                                     ) : (
                                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center border border-white/10">
                                             <span className="text-xs font-bold text-white">
-                                                {(user?.user_metadata?.full_name || user?.user_metadata?.username || user?.email?.charAt(0) || "U").charAt(0).toUpperCase()}
+                                                {(user.user_metadata?.full_name || user.user_metadata?.username || user.email?.charAt(0) || "U").charAt(0).toUpperCase()}
                                             </span>
                                         </div>
                                     )}
                                     <div className="flex flex-col">
                                         <span className="text-muted-foreground group-hover:text-white transition-colors">
-                                            {user?.user_metadata?.full_name || user?.user_metadata?.username || user?.email?.split('@')[0]}
+                                            {user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split('@')[0]}
                                         </span>
                                         {/* Show current plan */}
                                         <span className="text-[10px] text-accent flex items-center gap-1">
@@ -170,6 +191,8 @@ export function Navbar() {
                                             onClick={async () => {
                                                 const supabase = createBrowserClient();
                                                 await supabase.auth.signOut();
+                                                setUser(null);
+                                                setProfile(null);
                                                 window.location.reload();
                                             }}
                                             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors text-left"
