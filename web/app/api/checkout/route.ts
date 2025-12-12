@@ -50,12 +50,14 @@ export async function GET(request: Request) {
         stripe_subscription_id: 'sub_mock_' + Math.random().toString(36).substring(7),
         subscription_status: 'active',
         plan_tier: plan,
+        has_selected_plan: true, // Mark plan as selected after mock payment
         subscription_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
         updated_at: new Date().toISOString()
       })
       .eq('id', user.id);
 
-    const successUrl = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/dashboard/settings?success=true&plan=${plan}`;
+    // Redirect to dashboard after successful mock payment
+    const successUrl = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/dashboard?success=true&plan=${plan}`;
     return NextResponse.redirect(successUrl, 303);
   }
 

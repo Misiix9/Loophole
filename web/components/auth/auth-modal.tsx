@@ -265,21 +265,22 @@ function PlanSelectionView() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Update profile with selected plan and mark as completed
-        await supabase.from('profiles').upsert({
-            id: user.id,
-            plan_tier: plan,
-            has_selected_plan: true,
-            updated_at: new Date().toISOString()
-        }, { onConflict: 'id' });
-
-        // If HOBBY: Just redirect to dashboard
+        // If HOBBY (free): Set plan and mark as completed immediately
         if (plan === 'hobby') {
+            await supabase.from('profiles').upsert({
+                id: user.id,
+                plan_tier: 'hobby',
+                has_selected_plan: true,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'id' });
+
             window.location.href = '/dashboard';
             return;
         }
 
-        // IF PAID: Redirect to checkout
+        // FOR PAID PLANS: Do NOT set has_selected_plan yet
+        // It will be set by Stripe webhook after successful payment
+        // Just redirect to checkout
         window.location.href = `/api/checkout?plan=${plan}&setup=true`;
     }
 

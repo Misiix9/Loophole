@@ -31,13 +31,14 @@ export async function POST(req: Request) {
 
     console.log(`Payment success for user: ${userId}, plan: ${planTier}`);
 
-    // Update user's profile with subscription info
+    // Update user's profile with subscription info AND mark plan as selected
     const { error } = await supabase.from('profiles')
       .update({
         stripe_customer_id: customerId,
         stripe_subscription_id: subscriptionId,
         subscription_status: 'active',
         plan_tier: planTier,
+        has_selected_plan: true, // Mark as selected only after payment confirmed
         updated_at: new Date().toISOString()
       })
       .eq('id', userId);
