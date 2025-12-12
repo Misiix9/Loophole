@@ -45,7 +45,11 @@ export default function AdminPage() {
             const meRes = await fetch('/api/auth/me');
             const meData = await meRes.json();
 
+            console.log('Admin check - API response:', meData);
+            console.log('Admin check - is_admin value:', meData.user?.is_admin);
+
             if (!meData.user?.is_admin) {
+                console.log('Admin check failed - redirecting to /');
                 router.push('/');
                 return;
             }
