@@ -24,6 +24,7 @@ export function Navbar() {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
+    const [signingOut, setSigningOut] = useState(false);
 
     useMotionValueEvent(scrollY, "change", (latest) => {
         if (latest > 50 && !isScrolled) setIsScrolled(true);
@@ -44,19 +45,21 @@ export function Navbar() {
                 }
 
                 setUser(user);
-                setLoading(false);
 
                 if (user) {
-                    // Check if profile exists and has selected a plan
-                    const { data: profileData } = await supabase
+                    // Fetch profile from database
+                    const { data: profileData, error: profileError } = await supabase
                         .from('profiles')
                         .select('id, has_selected_plan, plan_tier')
                         .eq('id', user.id)
                         .single();
 
-                    if (!profileData) {
+                    console.log("Profile data fetched:", profileData, profileError);
+
+                    if (profileError || !profileData) {
                         // Create profile if it doesn't exist
-                        await supabase.from('profiles').upsert({
+                        console.log("Creating new profile for user:", user.id);
+                        const { error: upsertError } = await supabase.from('profiles').upsert({
                             id: user.id,
                             email: user.email,
                             display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
@@ -68,20 +71,26 @@ export function Navbar() {
                             updated_at: new Date().toISOString()
                         }, { onConflict: 'id' });
 
-                        // New user - show plan selection modal
+                        if (upsertError) {
+                            console.error("Error creating profile:", upsertError);
+                        }
+
+                        // Set default profile
+                        setProfile({ id: user.id, plan_tier: 'hobby', has_selected_plan: false });
                         openModal("plan_selection");
                     } else {
+                        console.log("Setting profile:", profileData);
                         setProfile(profileData);
 
                         if (!profileData.has_selected_plan) {
-                            // Existing user who hasn't selected a plan yet
                             openModal("plan_selection");
                         } else if (!user.user_metadata?.username) {
-                            // Plan selected but no username - show username setup
                             openModal("username_setup");
                         }
                     }
                 }
+
+                setLoading(false);
             } catch (err) {
                 console.error("Error checking user:", err);
                 setLoading(false);
@@ -98,7 +107,6 @@ export function Navbar() {
 
                 if (event === 'SIGNED_IN' && session?.user) {
                     setUser(session.user);
-                    setLoading(false);
 
                     // Fetch profile
                     const { data: profileData } = await supabase
@@ -106,6 +114,8 @@ export function Navbar() {
                         .select('id, has_selected_plan, plan_tier')
                         .eq('id', session.user.id)
                         .single();
+
+                    console.log("Profile after sign in:", profileData);
 
                     if (profileData) {
                         setProfile(profileData);
@@ -122,11 +132,15 @@ export function Navbar() {
                             updated_at: new Date().toISOString()
                         }, { onConflict: 'id' });
 
+                        setProfile({ id: session.user.id, plan_tier: 'hobby', has_selected_plan: false });
                         openModal("plan_selection");
                     }
+
+                    setLoading(false);
                 } else if (event === 'SIGNED_OUT') {
                     setUser(null);
                     setProfile(null);
+                    setLoading(false);
                 }
             }
         );
@@ -135,6 +149,31 @@ export function Navbar() {
             subscription.unsubscribe();
         };
     }, [openModal]);
+
+    const handleSignOut = async () => {
+        try {
+            setSigningOut(true);
+            const supabase = createBrowserClient();
+
+            const { error } = await supabase.auth.signOut();
+
+            if (error) {
+                console.error("Sign out error:", error);
+                setSigningOut(false);
+                return;
+            }
+
+            // Clear local state
+            setUser(null);
+            setProfile(null);
+
+            // Force redirect to home page
+            window.location.href = '/';
+        } catch (err) {
+            console.error("Error during sign out:", err);
+            setSigningOut(false);
+        }
+    };
 
     const currentPlan = profile?.plan_tier || 'hobby';
     const currentPlanConfig = PLANS[currentPlan] || PLANS['hobby'];
@@ -252,16 +291,18 @@ export function Navbar() {
                                         </button>
                                         <div className="h-px bg-white/10 my-1 mx-2" />
                                         <button
-                                            onClick={async () => {
-                                                const supabase = createBrowserClient();
-                                                await supabase.auth.signOut();
-                                                setUser(null);
-                                                setProfile(null);
-                                                window.location.reload();
-                                            }}
-                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors text-left"
+                                            onClick={handleSignOut}
+                                            disabled={signingOut}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors text-left disabled:opacity-50"
                                         >
-                                            Sign Out
+                                            {signingOut ? (
+                                                <>
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                    Signing out...
+                                                </>
+                                            ) : (
+                                                'Sign Out'
+                                            )}
                                         </button>
                                     </div>
                                 </div>
