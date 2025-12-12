@@ -8,7 +8,7 @@ import { MagneticButton } from "@/components/ui/magnetic-button";
 import { useModal } from "@/context/modal-context";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { Crown } from "lucide-react";
+import { Crown, Loader2 } from "lucide-react";
 import { PLANS, PlanTier } from "@/lib/plans";
 
 interface Profile {
@@ -31,50 +31,109 @@ export function Navbar() {
     });
 
     useEffect(() => {
+        const supabase = createBrowserClient();
+
         const checkUser = async () => {
-            const supabase = createBrowserClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            setUser(user);
-            setLoading(false);
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser();
 
-            if (user) {
-                // Check if profile exists and has selected a plan
-                const { data: profileData } = await supabase
-                    .from('profiles')
-                    .select('id, has_selected_plan, plan_tier')
-                    .eq('id', user.id)
-                    .single();
+                if (error) {
+                    console.log("Auth error:", error);
+                    setLoading(false);
+                    return;
+                }
 
-                if (!profileData) {
-                    // Create profile if it doesn't exist
-                    await supabase.from('profiles').upsert({
-                        id: user.id,
-                        email: user.email,
-                        display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
-                        avatar_url: user.user_metadata?.avatar_url || '',
-                        username: user.user_metadata?.username || null,
-                        plan_tier: 'hobby',
-                        has_selected_plan: false,
-                        subscription_status: 'active',
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'id' });
+                setUser(user);
+                setLoading(false);
 
-                    // New user - show plan selection modal
-                    openModal("plan_selection");
-                } else {
-                    setProfile(profileData);
+                if (user) {
+                    // Check if profile exists and has selected a plan
+                    const { data: profileData } = await supabase
+                        .from('profiles')
+                        .select('id, has_selected_plan, plan_tier')
+                        .eq('id', user.id)
+                        .single();
 
-                    if (!profileData.has_selected_plan) {
-                        // Existing user who hasn't selected a plan yet
+                    if (!profileData) {
+                        // Create profile if it doesn't exist
+                        await supabase.from('profiles').upsert({
+                            id: user.id,
+                            email: user.email,
+                            display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+                            avatar_url: user.user_metadata?.avatar_url || '',
+                            username: user.user_metadata?.username || null,
+                            plan_tier: 'hobby',
+                            has_selected_plan: false,
+                            subscription_status: 'active',
+                            updated_at: new Date().toISOString()
+                        }, { onConflict: 'id' });
+
+                        // New user - show plan selection modal
                         openModal("plan_selection");
-                    } else if (!user.user_metadata?.username) {
-                        // Plan selected but no username - show username setup
-                        openModal("username_setup");
+                    } else {
+                        setProfile(profileData);
+
+                        if (!profileData.has_selected_plan) {
+                            // Existing user who hasn't selected a plan yet
+                            openModal("plan_selection");
+                        } else if (!user.user_metadata?.username) {
+                            // Plan selected but no username - show username setup
+                            openModal("username_setup");
+                        }
                     }
                 }
+            } catch (err) {
+                console.error("Error checking user:", err);
+                setLoading(false);
             }
         };
+
+        // Initial check
         checkUser();
+
+        // Listen for auth state changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                console.log("Auth state change:", event, session?.user?.email);
+
+                if (event === 'SIGNED_IN' && session?.user) {
+                    setUser(session.user);
+                    setLoading(false);
+
+                    // Fetch profile
+                    const { data: profileData } = await supabase
+                        .from('profiles')
+                        .select('id, has_selected_plan, plan_tier')
+                        .eq('id', session.user.id)
+                        .single();
+
+                    if (profileData) {
+                        setProfile(profileData);
+                    } else {
+                        // Create profile for new user
+                        await supabase.from('profiles').upsert({
+                            id: session.user.id,
+                            email: session.user.email,
+                            display_name: session.user.user_metadata?.full_name || '',
+                            avatar_url: session.user.user_metadata?.avatar_url || '',
+                            plan_tier: 'hobby',
+                            has_selected_plan: false,
+                            subscription_status: 'active',
+                            updated_at: new Date().toISOString()
+                        }, { onConflict: 'id' });
+
+                        openModal("plan_selection");
+                    }
+                } else if (event === 'SIGNED_OUT') {
+                    setUser(null);
+                    setProfile(null);
+                }
+            }
+        );
+
+        return () => {
+            subscription.unsubscribe();
+        };
     }, [openModal]);
 
     const currentPlan = profile?.plan_tier || 'hobby';
@@ -136,7 +195,12 @@ export function Navbar() {
                 </nav>
 
                 <div className="flex items-center gap-4">
-                    {!loading && user ? (
+                    {loading ? (
+                        // Show loading spinner while checking auth
+                        <div className="flex items-center justify-center w-[100px]">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : user ? (
                         <div className="flex items-center gap-4 animate-in fade-in duration-500">
 
                             {/* User Menu Dropdown */}
@@ -213,16 +277,14 @@ export function Navbar() {
                             </MagneticButton>
                         </div>
                     ) : (
-                        !loading && (
-                            <MagneticButton>
-                                <button
-                                    onClick={() => openModal('auth')}
-                                    className="text-sm font-medium bg-white text-black px-5 py-2 rounded-full hover:bg-white/90 transition-all shadow-lg hover:shadow-xl font-bold block"
-                                >
-                                    Sign In
-                                </button>
-                            </MagneticButton>
-                        )
+                        <MagneticButton>
+                            <button
+                                onClick={() => openModal('auth')}
+                                className="text-sm font-medium bg-white text-black px-5 py-2 rounded-full hover:bg-white/90 transition-all shadow-lg hover:shadow-xl font-bold block"
+                            >
+                                Sign In
+                            </button>
+                        </MagneticButton>
                     )}
                 </div>
             </motion.header>
