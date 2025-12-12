@@ -34,6 +34,7 @@ export default function AdminPage() {
     const [search, setSearch] = useState('');
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
     useEffect(() => {
         checkAdminAndLoad();
@@ -45,7 +46,18 @@ export default function AdminPage() {
             const meRes = await fetch('/api/auth/me');
             const meData = await meRes.json();
 
-            if (!meData.user?.is_admin) {
+            // Debug: show what we got
+            console.log('Admin check response:', meData);
+            setDebugInfo(JSON.stringify(meData, null, 2));
+
+            if (!meData.user) {
+                console.log('No user found, redirecting...');
+                router.push('/');
+                return;
+            }
+
+            if (!meData.user.is_admin) {
+                console.log('User is not admin:', meData.user.is_admin);
                 router.push('/');
                 return;
             }
