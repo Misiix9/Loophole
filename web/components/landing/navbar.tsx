@@ -29,13 +29,34 @@ export function Navbar() {
             setUser(user);
             setLoading(false);
 
-            // Onboarding: Check if username is missing
-            if (user && !user.user_metadata?.username) {
-                openModal("username_setup");
+            if (user) {
+                // Ensure profile exists in database
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('id', user.id)
+                    .single();
+
+                if (!profile) {
+                    // Create profile if it doesn't exist
+                    await supabase.from('profiles').upsert({
+                        id: user.id,
+                        email: user.email,
+                        display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+                        avatar_url: user.user_metadata?.avatar_url || '',
+                        username: user.user_metadata?.username || null,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'id' });
+                }
+
+                // Onboarding: Check if username is missing
+                if (!user.user_metadata?.username) {
+                    openModal("username_setup");
+                }
             }
         };
         checkUser();
-    }, []);
+    }, [openModal]);
 
     return (
         <div className="flex justify-center w-full fixed top-0 z-50 transition-all duration-300 pointer-events-none">
@@ -102,7 +123,13 @@ export function Navbar() {
                                     className="hidden sm:flex items-center gap-3 text-sm font-medium py-2 cursor-pointer transition-opacity hover:opacity-80"
                                 >
                                     {user.user_metadata?.avatar_url ? (
-                                        <Image src={user.user_metadata.avatar_url} alt="Profile" width={32} height={32} className="rounded-full border border-white/10" />
+                                        <img
+                                            src={user.user_metadata.avatar_url}
+                                            alt="Profile"
+                                            width={32}
+                                            height={32}
+                                            className="w-8 h-8 rounded-full border border-white/10 object-cover"
+                                        />
                                     ) : (
                                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center border border-white/10">
                                             <span className="text-xs font-bold text-white">

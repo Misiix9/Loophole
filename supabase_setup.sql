@@ -1,67 +1,34 @@
---1. Modify existing profiles table to add 'username' if missing
-alter table public.profiles 
-add column if not exists username text unique;
+-- ==========================================
+    --LOOPHOLE - ESSENTIAL RLS POLICIES
+--Run this in Supabase SQL Editor
+-- ==========================================
 
---2. Enable RLS(just in case)
-alter table public.profiles enable row level security;
+    --Ensure RLS is enabled
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
---3. Update Policy to allow users to update their own profile(including username)
-drop policy if exists "Users can update own profile." on profiles;
-create policy "Users can update own profile."
-  on profiles for update
-  using(auth.uid() = id);
+--Drop all existing policies first
+DROP POLICY IF EXISTS "Users can view all profiles" ON profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON profiles;
+DROP POLICY IF EXISTS "Users can update own profile." ON profiles;
+DROP POLICY IF EXISTS "Enable insert for users" ON profiles;
 
-    drop policy if exists "Public profiles are viewable by everyone." on profiles;
-create policy "Public profiles are viewable by everyone."
-  on profiles for select
-  using(true);
+--Create fresh policies
+CREATE POLICY "Enable read access for all users" ON profiles
+  FOR SELECT USING(true);
 
-    --4. Function to handle new user signup
-create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
-begin
-  insert into public.profiles(id, email, display_name, avatar_url, username)
-values(
-    new.id,
-    new.email, --Sync email as well since your table has it
-    COALESCE(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name'), --Map to display_name
-    new.raw_user_meta_data ->> 'avatar_url',
-    new.raw_user_meta_data ->> 'username'
-)
-  on conflict(id) do update set
-    email = excluded.email,
-    display_name = excluded.display_name,
-    avatar_url = excluded.avatar_url,
-    username = excluded.username;
+CREATE POLICY "Enable insert for authenticated users" ON profiles
+  FOR INSERT WITH CHECK(auth.uid() = id);
 
-return new;
-end;
-$$;
+CREATE POLICY "Enable update for users based on id" ON profiles
+  FOR UPDATE USING(auth.uid() = id);
 
---5. Trigger to call the function on insert
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-for each row execute procedure public.handle_new_user();
+--Ensure the profiles table has all needed columns
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS username TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
---6. STORAGE BUCKET FOR AVATARS
---Run this in the Supabase Dashboard > Storage > Create bucket
---Bucket name: avatars
---Public bucket: YES(enable public access)
--- 
---Or run this SQL if you have storage admin access:
---insert into storage.buckets(id, name, public)
---values('avatars', 'avatars', true);
-
---Storage policy for authenticated uploads
---Go to Storage > Policies and add:
---Policy name: "Users can upload avatars"
---Allowed operation: INSERT
---Policy definition: (bucket_id = 'avatars') AND(auth.uid() IS NOT NULL)
-
---Policy name: "Public avatar access"
---Allowed operation: SELECT
---Policy definition: (bucket_id = 'avatars')
+--Grant permissions
+GRANT ALL ON public.profiles TO authenticated;
+GRANT ALL ON public.profiles TO anon;
