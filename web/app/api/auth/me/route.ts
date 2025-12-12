@@ -11,6 +11,7 @@ export interface UserData {
     plan_tier: 'hobby' | 'creator' | 'startup';
     subscription_status?: string;
     stripe_subscription_id?: string | null;
+    is_admin?: boolean;
 }
 
 export async function GET() {
@@ -28,7 +29,7 @@ export async function GET() {
         const adminSupabase = createAdminClient();
         const { data: profile, error: profileError } = await adminSupabase
             .from('profiles')
-            .select('username, display_name, avatar_url, plan_tier, subscription_status, stripe_subscription_id')
+            .select('username, display_name, avatar_url, plan_tier, subscription_status, stripe_subscription_id, is_admin')
             .eq('id', user.id)
             .single();
 
@@ -43,7 +44,8 @@ export async function GET() {
                     display_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
                     avatar_url: user.user_metadata?.avatar_url || null,
                     plan_tier: 'hobby' as const,
-                    subscription_status: 'active'
+                    subscription_status: 'active',
+                    is_admin: false
                 }
             });
         }
@@ -57,7 +59,8 @@ export async function GET() {
             avatar_url: profile.avatar_url || user.user_metadata?.avatar_url || null,
             plan_tier: profile.plan_tier || 'hobby',
             subscription_status: profile.subscription_status,
-            stripe_subscription_id: profile.stripe_subscription_id
+            stripe_subscription_id: profile.stripe_subscription_id,
+            is_admin: profile.is_admin || false
         };
 
         return NextResponse.json({ user: userData });
