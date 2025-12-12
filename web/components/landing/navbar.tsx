@@ -24,7 +24,7 @@ export function Navbar() {
 
     // Handle onboarding modals
     useEffect(() => {
-        if (!loading && isLoggedIn && profile) {
+        if (!loading && user && profile) {
             if (!profile.has_selected_plan) {
                 openModal("plan_selection");
             } else if (!user?.user_metadata?.username) {
@@ -36,7 +36,7 @@ export function Navbar() {
     // Create profile if it doesn't exist
     useEffect(() => {
         const ensureProfile = async () => {
-            if (!loading && isLoggedIn && user && profile === null) {
+            if (!loading && user && profile === null) {
                 const supabase = createBrowserClient();
                 await supabase.from('profiles').upsert({
                     id: user.id,
@@ -55,9 +55,9 @@ export function Navbar() {
             }
         };
         ensureProfile();
-    }, [loading, isLoggedIn, user, profile, refreshProfile, openModal]);
+    }, [loading, user, profile, refreshProfile, openModal]);
 
-    const currentPlanConfig = PLANS[currentPlan];
+    const currentPlanConfig = PLANS[currentPlan] || PLANS['hobby'];
 
     return (
         <div className="flex justify-center w-full fixed top-0 z-50 transition-all duration-300 pointer-events-none">
@@ -115,7 +115,7 @@ export function Navbar() {
                 </nav>
 
                 <div className="flex items-center gap-4">
-                    {!loading && isLoggedIn ? (
+                    {!loading && user ? (
                         <div className="flex items-center gap-4 animate-in fade-in duration-500">
 
                             {/* User Menu Dropdown */}
