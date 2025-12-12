@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/tooltip"
 import Image from "next/image";
 import { useSidebar } from "@/components/sidebar-provider";
-import { User } from "@supabase/supabase-js";
 import { PLANS, PlanTier } from "@/lib/plans";
 
 type Team = {
@@ -25,17 +24,18 @@ type Team = {
   slug: string;
 };
 
-type Profile = {
+type UserData = {
   id: string;
-  plan_tier: PlanTier;
+  email: string;
+  username: string | null;
   display_name: string | null;
   avatar_url: string | null;
+  plan_tier: PlanTier;
 };
 
 export function DashboardSidebar() {
   const [teams, setTeams] = useState<Team[]>([]);
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const { isCollapsed, toggleSidebar } = useSidebar();
   const pathname = usePathname();
   const supabase = createClient();
@@ -46,29 +46,22 @@ export function DashboardSidebar() {
       const { data: teamsData } = await supabase.from('teams').select('*');
       if (teamsData) setTeams(teamsData);
 
-      // Fetch user
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-
-      // Fetch profile from server-side API (ensures correct data)
-      if (user) {
-        try {
-          const response = await fetch('/api/auth/profile');
-          const data = await response.json();
-
-          if (data.profile) {
-            setProfile(data.profile);
-          }
-        } catch (err) {
-          console.error('Profile fetch error:', err);
+      // Fetch user data from server-side API
+      try {
+        const response = await fetch('/api/auth/me');
+        const data = await response.json();
+        if (data.user) {
+          setUserData(data.user);
         }
+      } catch (err) {
+        console.error('User fetch error:', err);
       }
     };
     fetchData();
   }, []);
 
-  // Only show plan if profile is loaded
-  const currentPlan = profile?.plan_tier;
+  // Only show plan if user data is loaded
+  const currentPlan = userData?.plan_tier;
   const currentPlanConfig = currentPlan ? PLANS[currentPlan] : null;
 
   const NavItem = ({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive: boolean }) => {
@@ -228,7 +221,7 @@ export function DashboardSidebar() {
       {/* Footer with User Profile */}
       <div className="p-3 border-t border-border mt-auto flex flex-col gap-2">
         {/* User Profile Section */}
-        {user && (
+        {userData && (
           <div className={cn(
             "flex items-center gap-3 p-2 rounded-lg bg-secondary/50 mb-2",
             isCollapsed && "justify-center p-1"
@@ -239,16 +232,16 @@ export function DashboardSidebar() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="relative">
-                      {user.user_metadata?.avatar_url ? (
+                      {userData.avatar_url ? (
                         <img
-                          src={user.user_metadata.avatar_url}
+                          src={userData.avatar_url}
                           alt="Profile"
                           className="w-8 h-8 rounded-full border border-white/10 object-cover"
                         />
                       ) : (
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center border border-white/10">
                           <span className="text-xs font-bold text-white">
-                            {(user.user_metadata?.full_name || user.email?.charAt(0) || "U").charAt(0).toUpperCase()}
+                            {(userData.display_name || userData.username || userData.email.charAt(0)).charAt(0).toUpperCase()}
                           </span>
                         </div>
                       )}
@@ -260,7 +253,7 @@ export function DashboardSidebar() {
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="right">
-                    <div className="text-sm font-medium">{user.user_metadata?.full_name || user.email?.split('@')[0]}</div>
+                    <div className="text-sm font-medium">{userData.display_name || userData.username || userData.email.split('@')[0]}</div>
                     {currentPlanConfig && <div className="text-xs text-muted-foreground">{currentPlanConfig.name}</div>}
                   </TooltipContent>
                 </Tooltip>
@@ -268,23 +261,23 @@ export function DashboardSidebar() {
             ) : (
               <>
                 <div className="relative shrink-0">
-                  {user.user_metadata?.avatar_url ? (
+                  {userData.avatar_url ? (
                     <img
-                      src={user.user_metadata.avatar_url}
+                      src={userData.avatar_url}
                       alt="Profile"
                       className="w-9 h-9 rounded-full border border-white/10 object-cover"
                     />
                   ) : (
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center border border-white/10">
                       <span className="text-sm font-bold text-white">
-                        {(user.user_metadata?.full_name || user.email?.charAt(0) || "U").charAt(0).toUpperCase()}
+                        {(userData.display_name || userData.username || userData.email.charAt(0)).charAt(0).toUpperCase()}
                       </span>
                     </div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-foreground truncate">
-                    {user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split('@')[0]}
+                    {userData.display_name || userData.username || userData.email.split('@')[0]}
                   </div>
                   {currentPlanConfig && (
                     <div className="text-[10px] text-accent flex items-center gap-1">

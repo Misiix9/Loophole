@@ -4,18 +4,10 @@ import { NextResponse } from 'next/server';
 export async function POST() {
     try {
         const supabase = await createClient();
-
-        // Sign out the user
-        const { error } = await supabase.auth.signOut();
-
-        if (error) {
-            console.error('Sign out error:', error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
-        }
-
+        await supabase.auth.signOut();
         return NextResponse.json({ success: true });
     } catch (err) {
-        console.error('Sign out failed:', err);
-        return NextResponse.json({ error: 'Sign out failed' }, { status: 500 });
+        console.error('Sign out error:', err);
+        return NextResponse.json({ success: false, error: 'Sign out failed' }, { status: 500 });
     }
 }
