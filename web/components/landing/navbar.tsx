@@ -30,10 +30,10 @@ export function Navbar() {
             setLoading(false);
 
             if (user) {
-                // Ensure profile exists in database
+                // Check if profile exists and has selected a plan
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('id')
+                    .select('id, has_selected_plan')
                     .eq('id', user.id)
                     .single();
 
@@ -45,12 +45,19 @@ export function Navbar() {
                         display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
                         avatar_url: user.user_metadata?.avatar_url || '',
                         username: user.user_metadata?.username || null,
+                        plan_tier: 'hobby',
+                        has_selected_plan: false,
+                        subscription_status: 'active',
                         updated_at: new Date().toISOString()
                     }, { onConflict: 'id' });
-                }
 
-                // Onboarding: Check if username is missing
-                if (!user.user_metadata?.username) {
+                    // New user - show plan selection modal
+                    openModal("plan_selection");
+                } else if (!profile.has_selected_plan) {
+                    // Existing user who hasn't selected a plan yet
+                    openModal("plan_selection");
+                } else if (!user.user_metadata?.username) {
+                    // Plan selected but no username - show username setup
                     openModal("username_setup");
                 }
             }

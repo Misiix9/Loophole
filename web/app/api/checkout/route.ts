@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { createClient } from '@/utils/supabase/server';
+import { PlanTier } from '@/lib/plans';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,61 +15,59 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  let teamId = searchParams.get('teamId');
-  const plan = searchParams.get('plan') || 'monthly';
-  const isSetup = searchParams.get('setup') === 'true';
+  const plan = (searchParams.get('plan') || 'creator') as PlanTier;
 
-  // Resolving Team ID for auto-setup
-  if (!teamId && isSetup) {
-    // Fetch user's personal team
-    const { data: teams } = await supabase.from('teams').select('id').limit(1);
-    if (teams && teams.length > 0) {
-      teamId = teams[0].id;
-    } else {
-      // Fallback: Create a team? For now, if no team, error out or redirect to onboarding.
-      // Assuming triggers create a team on signup.
-      return NextResponse.json({ error: 'No team found for user. Please complete onboarding.' }, { status: 400 });
-    }
-  }
-
-  if (!teamId) {
-    return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });
+  // Hobby plan is free, no checkout needed
+  if (plan === 'hobby') {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   // Define Price IDs
   const PRICES: Record<string, string> = {
     'creator': process.env.STRIPE_PRICE_ID_CREATOR || 'price_creator_mock',
     'startup': process.env.STRIPE_PRICE_ID_STARTUP || 'price_startup_mock',
-    // Legacy support if needed
-    'monthly': process.env.STRIPE_PRICE_ID_MONTHLY || 'price_monthly_mock',
   };
 
   const selectedPriceId = PRICES[plan];
 
-  // MOCK MODE
+  if (!selectedPriceId) {
+    return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
+  }
+
+  // MOCK MODE - If no valid Stripe key, simulate successful payment
   const isMockKey = !process.env.STRIPE_SECRET_KEY?.startsWith('sk_');
 
   if (isMockKey) {
-    console.log('Using Mock Stripe Checkout for key:', process.env.STRIPE_SECRET_KEY);
+    console.log('Using Mock Stripe Checkout for plan:', plan);
 
     const { createAdminClient } = await import('@/utils/supabase/admin');
     const adminSupabase = createAdminClient();
 
-    await adminSupabase.from('teams')
+    // Update user's profile directly (mock payment success)
+    await adminSupabase.from('profiles')
       .update({
         stripe_customer_id: 'cus_mock_' + Math.random().toString(36).substring(7),
         stripe_subscription_id: 'sub_mock_' + Math.random().toString(36).substring(7),
         subscription_status: 'active',
-        plan_tier: plan // 'creator', 'startup'
+        plan_tier: plan,
+        subscription_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        updated_at: new Date().toISOString()
       })
-      .eq('id', teamId);
+      .eq('id', user.id);
 
-    const successUrl = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/dashboard?success=true&plan=${plan}`;
+    const successUrl = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/dashboard/settings?success=true&plan=${plan}`;
     return NextResponse.redirect(successUrl, 303);
   }
 
+  // Real Stripe checkout
   try {
-    const session = await stripe.checkout.sessions.create({
+    // Check if user already has a Stripe customer ID
+    const { data: profile } = await supabase.from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', user.id)
+      .single();
+
+    const sessionConfig: any = {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [
@@ -78,16 +77,25 @@ export async function GET(request: Request) {
         },
       ],
       metadata: {
-        teamId: teamId,
+        userId: user.id,
         planTier: plan
       },
-      success_url: `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/dashboard?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}?canceled=true`,
-    });
+      success_url: `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/dashboard/settings?success=true&plan=${plan}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/dashboard/settings?canceled=true`,
+    };
+
+    // Use existing customer if available
+    if (profile?.stripe_customer_id) {
+      sessionConfig.customer = profile.stripe_customer_id;
+    } else {
+      sessionConfig.customer_email = user.email;
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     return NextResponse.redirect(session.url!, 303);
   } catch (error: any) {
-    console.error(error);
+    console.error('Stripe checkout error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -9,7 +9,6 @@ import {
   Shield,
   CreditCard,
   Bell,
-  Globe,
   Terminal,
   Key,
   Trash2,
@@ -25,9 +24,11 @@ import {
   Link2,
   Zap,
   Clock,
-  Server
+  Server,
+  Crown
 } from "lucide-react";
 import Link from "next/link";
+import { PLANS, PLAN_ORDER, PlanTier, getPlan } from "@/lib/plans";
 
 type UserProfile = {
   id: string;
@@ -39,9 +40,17 @@ type UserProfile = {
   };
 };
 
+type ProfileData = {
+  id: string;
+  plan_tier: PlanTier;
+  subscription_status: string;
+  subscription_period_end: string | null;
+};
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("profile");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Profile states
@@ -81,6 +90,9 @@ export default function SettingsPage() {
   const supabase = createClient();
   const router = useRouter();
 
+  // Get current plan info
+  const currentPlan = getPlan(profileData?.plan_tier);
+
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -89,6 +101,17 @@ export default function SettingsPage() {
         setUsername(user.user_metadata?.username || "");
         setDisplayName(user.user_metadata?.full_name || "");
         setAvatarUrl(user.user_metadata?.avatar_url || null);
+
+        // Fetch profile data from database (includes plan info)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, plan_tier, subscription_status, subscription_period_end')
+          .eq('id', user.id)
+          .single();
+
+        if (profile) {
+          setProfileData(profile as ProfileData);
+        }
       }
       setLoading(false);
     };
@@ -195,6 +218,10 @@ export default function SettingsPage() {
     }
   };
 
+  const handleUpgrade = (tier: PlanTier) => {
+    window.location.href = `/api/checkout?plan=${tier}&setup=true`;
+  };
+
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
     { id: "security", label: "Security", icon: Shield },
@@ -265,7 +292,7 @@ export default function SettingsPage() {
                 <div className="p-6 rounded-2xl border border-white/10 bg-white/5">
                   <h3 className="text-sm font-bold uppercase text-muted-foreground mb-4">Profile Picture</h3>
                   <div className="flex items-center gap-6">
-                    <div className="relative group">
+                    <label className="relative group cursor-pointer">
                       {avatarUrl ? (
                         <img src={avatarUrl} alt="Avatar" className="w-24 h-24 rounded-full border-2 border-white/10 object-cover" />
                       ) : (
@@ -273,11 +300,11 @@ export default function SettingsPage() {
                           <span className="text-3xl font-bold">{(displayName || username || "U").charAt(0).toUpperCase()}</span>
                         </div>
                       )}
-                      <label className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                         <span className="text-xs font-bold">Change</span>
-                      </label>
+                      </div>
                       <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
-                    </div>
+                    </label>
                     <div>
                       <p className="font-medium">Upload a new photo</p>
                       <p className="text-sm text-muted-foreground">JPG, PNG or GIF. Max 2MB.</p>
@@ -492,15 +519,18 @@ export default function SettingsPage() {
                       <label className="text-sm font-medium flex items-center gap-2">
                         <Link2 className="w-4 h-4 text-accent" />
                         Default Subdomain
+                        {!currentPlan.limits.maxCustomSubdomains && (
+                          <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">PRO</span>
+                        )}
                       </label>
                       <input
                         type="text"
                         value={defaultSubdomain}
                         onChange={(e) => setDefaultSubdomain(e.target.value)}
-                        className="w-full h-11 bg-black/50 border border-white/10 rounded-xl px-4 text-white focus:outline-none focus:border-accent transition-colors"
-                        placeholder="my-app"
+                        disabled={!currentPlan.limits.maxCustomSubdomains}
+                        className="w-full h-11 bg-black/50 border border-white/10 rounded-xl px-4 text-white focus:outline-none focus:border-accent transition-colors disabled:opacity-50"
+                        placeholder={currentPlan.limits.maxCustomSubdomains ? "my-app" : "Upgrade to use custom subdomains"}
                       />
-                      <p className="text-xs text-muted-foreground">Leave empty for random subdomain</p>
                     </div>
 
                     <div className="space-y-2">
@@ -531,7 +561,7 @@ export default function SettingsPage() {
                         <option value="60">1 hour</option>
                         <option value="120">2 hours</option>
                         <option value="480">8 hours</option>
-                        <option value="0">Never (Pro only)</option>
+                        <option value="0" disabled={currentPlan.id === 'hobby'}>Never (Pro only)</option>
                       </select>
                     </div>
                   </div>
@@ -541,9 +571,9 @@ export default function SettingsPage() {
                   <h3 className="text-sm font-bold uppercase text-muted-foreground">Behavior</h3>
 
                   {[
-                    { id: "autoReconnect", label: "Auto Reconnect", desc: "Automatically reconnect when connection drops", icon: RefreshCw, value: autoReconnect, setter: setAutoReconnect },
-                    { id: "keepAlive", label: "Keep Alive", desc: "Send periodic pings to keep connection active", icon: Zap, value: keepAlive, setter: setKeepAlive },
-                    { id: "requestLogging", label: "Request Logging", desc: "Log all incoming requests to tunnel", icon: Terminal, value: requestLogging, setter: setRequestLogging },
+                    { id: "autoReconnect", label: "Auto Reconnect", desc: "Automatically reconnect when connection drops", icon: RefreshCw, value: autoReconnect, setter: setAutoReconnect, requiresPro: false },
+                    { id: "keepAlive", label: "Keep Alive", desc: "Send periodic pings to keep connection active", icon: Zap, value: keepAlive, setter: setKeepAlive, requiresPro: false },
+                    { id: "requestLogging", label: "Request Logging", desc: "Log all incoming requests to tunnel", icon: Terminal, value: requestLogging, setter: setRequestLogging, requiresPro: !currentPlan.limits.requestLogging },
                   ].map((item) => (
                     <div key={item.id} className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
                       <div className="flex items-center gap-3">
@@ -551,15 +581,19 @@ export default function SettingsPage() {
                           <item.icon className="w-4 h-4 text-accent" />
                         </div>
                         <div>
-                          <p className="font-medium">{item.label}</p>
+                          <p className="font-medium flex items-center gap-2">
+                            {item.label}
+                            {item.requiresPro && <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">PRO</span>}
+                          </p>
                           <p className="text-sm text-muted-foreground">{item.desc}</p>
                         </div>
                       </div>
                       <button
-                        onClick={() => item.setter(!item.value)}
-                        className={`w-12 h-7 rounded-full transition-colors relative ${item.value ? "bg-accent" : "bg-white/10"}`}
+                        onClick={() => !item.requiresPro && item.setter(!item.value)}
+                        disabled={item.requiresPro}
+                        className={`w-12 h-7 rounded-full transition-colors relative ${item.value && !item.requiresPro ? "bg-accent" : "bg-white/10"} ${item.requiresPro ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
-                        <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${item.value ? "left-6" : "left-1"}`} />
+                        <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${item.value && !item.requiresPro ? "left-6" : "left-1"}`} />
                       </button>
                     </div>
                   ))}
@@ -575,41 +609,125 @@ export default function SettingsPage() {
                   <p className="text-muted-foreground">Manage your subscription and payment methods.</p>
                 </div>
 
+                {/* Current Plan */}
                 <div className="p-6 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/10 to-purple-600/10 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
+                        <Crown className="w-5 h-5 text-accent" />
                         <h3 className="font-bold text-lg">Current Plan</h3>
-                        <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full font-bold">FREE</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${currentPlan.id === 'hobby'
+                            ? 'bg-white/10 text-white'
+                            : 'bg-accent/20 text-accent'
+                          }`}>
+                          {currentPlan.name.toUpperCase()}
+                        </span>
                       </div>
-                      <p className="text-muted-foreground text-sm">You're on the Hobby plan</p>
+                      <p className="text-muted-foreground text-sm">
+                        {currentPlan.priceDisplay}/month • {profileData?.subscription_status === 'active' ? 'Active' : 'Inactive'}
+                      </p>
+                      {profileData?.subscription_period_end && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Renews on {new Date(profileData.subscription_period_end).toLocaleDateString()}
+                        </p>
+                      )}
                     </div>
-                    <button className="h-11 px-6 bg-accent text-black font-bold rounded-xl hover:bg-accent/90 transition-colors">
-                      Upgrade to Pro
-                    </button>
+                    {currentPlan.id !== 'startup' && (
+                      <button
+                        onClick={() => handleUpgrade(currentPlan.id === 'hobby' ? 'creator' : 'startup')}
+                        className="h-11 px-6 bg-accent text-black font-bold rounded-xl hover:bg-accent/90 transition-colors"
+                      >
+                        Upgrade Plan
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                  {[
-                    { name: "Hobby", price: "$0", features: ["1 Tunnel", "Random subdomain", "Community support"] },
-                    { name: "Creator", price: "$9", features: ["5 Tunnels", "3 Custom subdomains", "Priority support", "Request logging"], popular: true },
-                    { name: "Startup", price: "$29", features: ["Unlimited Tunnels", "10 Custom subdomains", "Team collaboration", "Advanced analytics"] },
-                  ].map((plan) => (
-                    <div key={plan.name} className={`p-6 rounded-2xl border ${plan.popular ? "border-accent bg-accent/5" : "border-white/10 bg-white/5"}`}>
-                      {plan.popular && <span className="text-xs bg-accent text-black px-2 py-0.5 rounded-full font-bold mb-2 inline-block">POPULAR</span>}
-                      <h3 className="font-bold text-lg">{plan.name}</h3>
-                      <p className="text-3xl font-bold mt-2">{plan.price}<span className="text-sm text-muted-foreground font-normal">/mo</span></p>
-                      <ul className="mt-4 space-y-2">
-                        {plan.features.map((feature) => (
-                          <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <CheckCircle className="w-4 h-4 text-accent" />
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
+                {/* Plan Limits */}
+                <div className="p-6 rounded-2xl border border-white/10 bg-white/5 space-y-4">
+                  <h3 className="text-sm font-bold uppercase text-muted-foreground">Your Plan Includes</h3>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-accent" />
+                      <span>{currentPlan.limits.maxTunnels} concurrent tunnel{currentPlan.limits.maxTunnels > 1 ? 's' : ''}</span>
                     </div>
-                  ))}
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-accent" />
+                      <span>{currentPlan.limits.maxCustomSubdomains || 'No'} custom subdomain{currentPlan.limits.maxCustomSubdomains !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {currentPlan.limits.tcpTunnels ? <CheckCircle className="w-4 h-4 text-accent" /> : <span className="w-4 h-4 text-muted-foreground">✕</span>}
+                      <span className={!currentPlan.limits.tcpTunnels ? "text-muted-foreground" : ""}>TCP tunnels</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {currentPlan.limits.passwordProtection ? <CheckCircle className="w-4 h-4 text-accent" /> : <span className="w-4 h-4 text-muted-foreground">✕</span>}
+                      <span className={!currentPlan.limits.passwordProtection ? "text-muted-foreground" : ""}>Password protection</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {currentPlan.limits.prioritySupport ? <CheckCircle className="w-4 h-4 text-accent" /> : <span className="w-4 h-4 text-muted-foreground">✕</span>}
+                      <span className={!currentPlan.limits.prioritySupport ? "text-muted-foreground" : ""}>Priority support</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {currentPlan.limits.sla ? <CheckCircle className="w-4 h-4 text-accent" /> : <span className="w-4 h-4 text-muted-foreground">✕</span>}
+                      <span className={!currentPlan.limits.sla ? "text-muted-foreground" : ""}>99.9% SLA</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* All Plans */}
+                <div className="grid gap-4 md:grid-cols-3">
+                  {PLAN_ORDER.map((planId) => {
+                    const plan = PLANS[planId];
+                    const isCurrent = planId === currentPlan.id;
+                    const canUpgradeTo = PLAN_ORDER.indexOf(planId) > PLAN_ORDER.indexOf(currentPlan.id);
+
+                    return (
+                      <div
+                        key={plan.id}
+                        className={`p-6 rounded-2xl border ${isCurrent
+                            ? "border-accent bg-accent/5"
+                            : plan.popular
+                              ? "border-accent/50 bg-white/5"
+                              : "border-white/10 bg-white/5"
+                          }`}
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          {plan.popular && !isCurrent && (
+                            <span className="text-xs bg-accent text-black px-2 py-0.5 rounded-full font-bold">POPULAR</span>
+                          )}
+                          {isCurrent && (
+                            <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full font-bold">CURRENT</span>
+                          )}
+                        </div>
+                        <h3 className="font-bold text-lg">{plan.name}</h3>
+                        <p className="text-3xl font-bold mt-2">
+                          {plan.priceDisplay}
+                          <span className="text-sm text-muted-foreground font-normal">/mo</span>
+                        </p>
+                        <ul className="mt-4 space-y-2">
+                          {plan.features.slice(0, 4).map((feature) => (
+                            <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <CheckCircle className="w-4 h-4 text-accent shrink-0" />
+                              <span className="truncate">{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        {canUpgradeTo && (
+                          <button
+                            onClick={() => handleUpgrade(planId)}
+                            className="w-full mt-4 h-10 bg-accent text-black font-bold rounded-xl hover:bg-accent/90 transition-colors"
+                          >
+                            Upgrade
+                          </button>
+                        )}
+                        {isCurrent && (
+                          <div className="w-full mt-4 h-10 bg-white/10 text-white font-bold rounded-xl flex items-center justify-center">
+                            Current Plan
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

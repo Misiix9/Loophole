@@ -263,48 +263,24 @@ function PlanSelectionView() {
         const supabase = createBrowserClient();
         setLoading(plan);
 
-        // 1. Get User/Team
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return; // Should allow re-login? 
+        if (!user) return;
 
-        // In a real app we'd fetch the user's team ID. 
-        // For simplicity assuming single-team per user or 'personal' logic inferred by backend.
-        // We will pass a dummy teamID if we don't have it, or fetch it.
-        // Existing checkout API REQUIRES teamID.
+        // Update profile with selected plan and mark as completed
+        await supabase.from('profiles').upsert({
+            id: user.id,
+            plan_tier: plan,
+            has_selected_plan: true,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
 
-        // Quick fetch of team
-        // We need a helper or a query here. 
-        // Assuming we are just redirecting to checkout API which handles it? 
-        // No, checkout API takes teamId as param. 
-
-        // Let's TRY to find a team for this user.
-        // Accessing 'teams' via public client might be blocked by RLS if not careful.
-        // Let's assume we redirect to a lightweight 'onboarding' API route?
-        // Or simpler: Pass 'user_id' to checkout and let it resolve the team.
-
-        // If HOBBY:
+        // If HOBBY: Just redirect to dashboard
         if (plan === 'hobby') {
-            // Just redirect to dashboard, maybe set a flag via API?
-            router.push('/dashboard');
+            window.location.href = '/dashboard';
             return;
         }
 
-        // IF PAID:
-        // We need the team ID. 
-        // Let's assume the user is on the dashboard page or we can get it.
-        // If we serve this modal on Landing Page, we might not have team ID easily without a fetch.
-
-        // Pivot: We will redirect to /api/checkout?plan=XX&creating=true
-        // The API should handle "If no team, create one for this user".
-        // But for now, let's just push to the Checkout API and Hope the backend can handle 'personal' team resolution 
-        // OR we just send them to dashboard and let them upgrade from there.
-
-        // User Request: "When user selects free, they can go freely. When paid, redirected to stripe."
-
-        // Implementation:
-        // Since we don't have teamID here easily in client component without context...
-        // We'll redirect to a helper route `/api/setup-subscription?plan=${plan}`
-
+        // IF PAID: Redirect to checkout
         window.location.href = `/api/checkout?plan=${plan}&setup=true`;
     }
 

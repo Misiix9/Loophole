@@ -1,10 +1,9 @@
 "use client";
 
 import { Check } from "lucide-react";
-import Link from "next/link";
 import { MagneticButton } from "@/components/ui/magnetic-button";
-import { motion } from "framer-motion";
 import { useModal } from "@/context/modal-context";
+import { PLANS, PLAN_ORDER, PlanTier } from "@/lib/plans";
 
 export function Pricing() {
     return (
@@ -19,52 +18,51 @@ export function Pricing() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto perspective-1000">
-                    <PricingCard
-                        tier="Hobby"
-                        price="$0"
-                        desc="For tinkering and side projects."
-                        features={[
-                            "Unlimited HTTP tunnels",
-                            "Random subdomains",
-                            "1 local process",
-                            "Community support"
-                        ]}
-                    />
-                    <PricingCard
-                        tier="Creator"
-                        price="$9"
-                        desc="For serious developers and freelancers."
-                        features={[
-                            "Everything in Hobby",
-                            "3 Custom subdomains (alex.loophole.app)",
-                            "3 concurrent tunnels",
-                            "Password protection",
-                            "TCP & WebSocket tunnels",
-                            "Priority Email Support"
-                        ]}
-                        highlight
-                    />
-                    <PricingCard
-                        tier="Startup"
-                        price="$29"
-                        desc="For small teams building next-gen apps."
-                        features={[
-                            "Everything in Creator",
-                            "5 Team Members",
-                            "Centralized dashboard",
-                            "Team Audit logs",
-                            "Shared custom domains",
-                            "99.9% SLA"
-                        ]}
-                    />
+                    {PLAN_ORDER.map((planId) => {
+                        const plan = PLANS[planId];
+                        return (
+                            <PricingCard
+                                key={plan.id}
+                                tier={plan.id}
+                                name={plan.name}
+                                price={plan.priceDisplay}
+                                desc={plan.description}
+                                features={plan.features}
+                                highlight={plan.popular}
+                            />
+                        );
+                    })}
                 </div>
             </div>
         </section>
     );
 }
 
-function PricingCard({ tier, price, desc, features, highlight }: { tier: string; price: string; desc: string; features: string[]; highlight?: boolean }) {
+function PricingCard({
+    tier,
+    name,
+    price,
+    desc,
+    features,
+    highlight
+}: {
+    tier: PlanTier;
+    name: string;
+    price: string;
+    desc: string;
+    features: string[];
+    highlight?: boolean
+}) {
     const { openModal } = useModal();
+
+    const handleClick = () => {
+        if (tier === 'hobby') {
+            openModal("auth");
+        } else {
+            // For paid plans, also open auth but will redirect to Stripe after
+            openModal("auth");
+        }
+    };
 
     return (
         <div className={`p-8 rounded-3xl border flex flex-col relative overflow-visible group perspective-1000 transition-all hover:scale-[1.02] duration-500 ${highlight ? 'bg-white/5 border-accent/50 shadow-2xl shadow-accent/10' : 'bg-white/[0.02] border-white/10'}`}>
@@ -81,7 +79,7 @@ function PricingCard({ tier, price, desc, features, highlight }: { tier: string;
             )}
 
             <div className="mb-8 relative z-10">
-                <h3 className="text-xl font-bold text-foreground mb-2">{tier}</h3>
+                <h3 className="text-xl font-bold text-foreground mb-2">{name}</h3>
                 <p className="text-sm text-muted-foreground">{desc}</p>
             </div>
 
@@ -101,17 +99,20 @@ function PricingCard({ tier, price, desc, features, highlight }: { tier: string;
                 ))}
             </ul>
 
-            {/* 3D Pop-out Button Container */}
-            <div className="relative z-20 transform-style-3d group-hover:translate-z-10 transition-transform duration-300">
-                <MagneticButton className="w-full">
-                    <button onClick={() => openModal('auth')} className={`block w-full py-4 rounded-xl font-bold text-center transition-all 
-                        ${highlight
-                            ? 'bg-accent text-white hover:bg-accent/90 shadow-[0_0_20px_rgba(var(--accent),0.4)] group-hover:shadow-[0_20px_40px_rgba(var(--accent),0.6)]'
-                            : 'bg-white/10 text-foreground hover:bg-white/20 group-hover:bg-white' // Making non-highlight buttons pop more on hover
-                        }
-                        group-hover:scale-105
-                    `}>
-                        Get {tier}
+            <div className="relative z-10 transform-style-3d">
+                <MagneticButton>
+                    <button
+                        onClick={handleClick}
+                        className={`
+                            w-full py-3.5 px-6 rounded-full font-bold text-sm transition-all duration-300 ease-out
+                            transform-gpu translate-z-0 group-hover:translate-z-10
+                            ${highlight
+                                ? 'bg-accent text-white hover:bg-accent/90 shadow-[0_0_20px_rgba(var(--accent),0.4)] group-hover:shadow-[0_20px_40px_rgba(var(--accent),0.6)]'
+                                : 'bg-white/10 text-foreground hover:bg-white/20 group-hover:bg-white group-hover:text-black'
+                            }
+                            group-hover:scale-105
+                        `}>
+                        Get {name}
                     </button>
                 </MagneticButton>
             </div>

@@ -3,9 +3,6 @@ import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { createAdminClient } from '@/utils/supabase/admin';
 
-// For now, assuming current Supabase client can't write to teams without being owner.
-// In a real app, use `createClient(url, service_role_key)`.
-
 export async function POST(req: Request) {
   const body = await req.text();
   const headerList = await headers();
@@ -24,32 +21,68 @@ export async function POST(req: Request) {
   }
 
   const session = event.data.object as any;
+  const supabase = createAdminClient();
 
   if (event.type === 'checkout.session.completed') {
-      const teamId = session.metadata.teamId;
-      const subscriptionId = session.subscription;
-      const customerId = session.customer;
+    const userId = session.metadata.userId;
+    const planTier = session.metadata.planTier || 'creator';
+    const subscriptionId = session.subscription;
+    const customerId = session.customer;
 
-      console.log(`Payment success for team: ${teamId}`);
+    console.log(`Payment success for user: ${userId}, plan: ${planTier}`);
 
-      // Update Database
-      // Note: Ideally use Service Role here. 
-      // For MVP/Demo, logging success.
-      
-      const supabase = createAdminClient();
-      const { error } = await supabase.from('teams')
-          .update({
-              stripe_customer_id: customerId,
-              stripe_subscription_id: subscriptionId,
-              subscription_status: 'active',
-              plan_tier: 'pro'
-          })
-          .eq('id', teamId);
-        
-      if (error) {
-          console.error('Failed to update team subscription:', error);
-          return NextResponse.json({ error: 'DB Update Failed' }, { status: 500 });
-      }
+    // Update user's profile with subscription info
+    const { error } = await supabase.from('profiles')
+      .update({
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscriptionId,
+        subscription_status: 'active',
+        plan_tier: planTier,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Failed to update user subscription:', error);
+      return NextResponse.json({ error: 'DB Update Failed' }, { status: 500 });
+    }
+  }
+
+  if (event.type === 'customer.subscription.updated') {
+    const subscriptionId = session.id;
+    const status = session.status; // 'active', 'canceled', 'past_due', etc.
+    const periodEnd = new Date(session.current_period_end * 1000).toISOString();
+
+    // Find user by subscription ID and update status
+    const { error } = await supabase.from('profiles')
+      .update({
+        subscription_status: status,
+        subscription_period_end: periodEnd,
+        updated_at: new Date().toISOString()
+      })
+      .eq('stripe_subscription_id', subscriptionId);
+
+    if (error) {
+      console.error('Failed to update subscription status:', error);
+    }
+  }
+
+  if (event.type === 'customer.subscription.deleted') {
+    const subscriptionId = session.id;
+
+    // Downgrade user to hobby plan
+    const { error } = await supabase.from('profiles')
+      .update({
+        plan_tier: 'hobby',
+        subscription_status: 'canceled',
+        stripe_subscription_id: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('stripe_subscription_id', subscriptionId);
+
+    if (error) {
+      console.error('Failed to cancel subscription:', error);
+    }
   }
 
   return NextResponse.json({ received: true });
