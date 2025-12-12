@@ -61,20 +61,21 @@ export function Navbar() {
                 if (session?.user) {
                     setUser(session.user);
 
-                    // Try to fetch profile, but don't block on it
-                    try {
-                        const { data: profileData } = await supabase
-                            .from('profiles')
-                            .select('id, has_selected_plan, plan_tier')
-                            .eq('id', session.user.id)
-                            .single();
+                    // Fetch profile from database
+                    const { data: profileData, error: profileError } = await supabase
+                        .from('profiles')
+                        .select('id, has_selected_plan, plan_tier')
+                        .eq('id', session.user.id)
+                        .single();
 
-                        if (profileData && isMounted) {
-                            setProfile(profileData);
-                        }
-                    } catch (profileErr) {
-                        console.error("Profile fetch error:", profileErr);
-                        // Continue without profile - will show default "Hobby"
+                    // Log what we got from the database
+                    console.log("Profile fetch result:", { profileData, profileError });
+
+                    if (profileData && isMounted) {
+                        console.log("Setting profile with plan_tier:", profileData.plan_tier);
+                        setProfile(profileData as Profile);
+                    } else if (profileError) {
+                        console.error("Profile fetch error:", profileError);
                     }
                 }
 
@@ -104,14 +105,16 @@ export function Navbar() {
                     setLoading(false);
 
                     // Fetch profile in background
-                    const { data: profileData } = await supabase
+                    const { data: profileData, error: profileError } = await supabase
                         .from('profiles')
                         .select('id, has_selected_plan, plan_tier')
                         .eq('id', session.user.id)
                         .single();
 
+                    console.log("Profile after sign in:", { profileData, profileError });
+
                     if (profileData && isMounted) {
-                        setProfile(profileData);
+                        setProfile(profileData as Profile);
                     }
                 } else if (event === 'SIGNED_OUT') {
                     setUser(null);
@@ -128,32 +131,39 @@ export function Navbar() {
         };
     }, []);
 
+    // Sign out with timeout - force redirect after 3 seconds even if signOut fails
     const handleSignOut = useCallback(async () => {
+        setSigningOut(true);
+
+        // Set a timeout to force redirect after 3 seconds
+        const forceRedirectTimeout = setTimeout(() => {
+            console.log("Sign out timed out, forcing redirect");
+            window.location.href = '/';
+        }, 3000);
+
         try {
-            setSigningOut(true);
             const supabase = createClient();
+            await supabase.auth.signOut();
+            clearTimeout(forceRedirectTimeout);
 
-            // Sign out from Supabase
-            const { error } = await supabase.auth.signOut();
-
-            if (error) {
-                console.error("Sign out error:", error);
-            }
-
-            // Clear state
+            // Clear state and redirect
             setUser(null);
             setProfile(null);
-
-            // Redirect to home
             window.location.href = '/';
         } catch (err) {
-            console.error("Sign out failed:", err);
-            setSigningOut(false);
+            console.error("Sign out error:", err);
+            clearTimeout(forceRedirectTimeout);
+            // Force redirect on error
+            window.location.href = '/';
         }
     }, []);
 
+    // Get plan from profile state
     const currentPlan = profile?.plan_tier || 'hobby';
     const currentPlanConfig = PLANS[currentPlan] || PLANS['hobby'];
+
+    // Log the current plan for debugging
+    console.log("Current plan from profile:", currentPlan, "Profile state:", profile);
 
     return (
         <div className="flex justify-center w-full fixed top-0 z-50 transition-all duration-300 pointer-events-none">
