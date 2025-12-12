@@ -40,6 +40,7 @@ export function Navbar() {
 
                 if (error) {
                     console.log("Auth error:", error);
+                    setUser(null);
                     setLoading(false);
                     return;
                 }
@@ -48,51 +49,53 @@ export function Navbar() {
 
                 if (user) {
                     // Fetch profile from database
-                    const { data: profileData, error: profileError } = await supabase
-                        .from('profiles')
-                        .select('id, has_selected_plan, plan_tier')
-                        .eq('id', user.id)
-                        .single();
+                    try {
+                        const { data: profileData, error: profileError } = await supabase
+                            .from('profiles')
+                            .select('id, has_selected_plan, plan_tier')
+                            .eq('id', user.id)
+                            .single();
 
-                    console.log("Profile data fetched:", profileData, profileError);
+                        console.log("Profile data fetched:", profileData, "Error:", profileError);
 
-                    if (profileError || !profileData) {
-                        // Create profile if it doesn't exist
-                        console.log("Creating new profile for user:", user.id);
-                        const { error: upsertError } = await supabase.from('profiles').upsert({
-                            id: user.id,
-                            email: user.email,
-                            display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
-                            avatar_url: user.user_metadata?.avatar_url || '',
-                            username: user.user_metadata?.username || null,
-                            plan_tier: 'hobby',
-                            has_selected_plan: false,
-                            subscription_status: 'active',
-                            updated_at: new Date().toISOString()
-                        }, { onConflict: 'id' });
+                        if (profileError || !profileData) {
+                            // Create profile if it doesn't exist
+                            console.log("Creating new profile for user:", user.id);
+                            await supabase.from('profiles').upsert({
+                                id: user.id,
+                                email: user.email,
+                                display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+                                avatar_url: user.user_metadata?.avatar_url || '',
+                                username: user.user_metadata?.username || null,
+                                plan_tier: 'hobby',
+                                has_selected_plan: false,
+                                subscription_status: 'active',
+                                updated_at: new Date().toISOString()
+                            }, { onConflict: 'id' });
 
-                        if (upsertError) {
-                            console.error("Error creating profile:", upsertError);
-                        }
-
-                        // Set default profile
-                        setProfile({ id: user.id, plan_tier: 'hobby', has_selected_plan: false });
-                        openModal("plan_selection");
-                    } else {
-                        console.log("Setting profile:", profileData);
-                        setProfile(profileData);
-
-                        if (!profileData.has_selected_plan) {
+                            // Set default profile
+                            setProfile({ id: user.id, plan_tier: 'hobby', has_selected_plan: false });
                             openModal("plan_selection");
-                        } else if (!user.user_metadata?.username) {
-                            openModal("username_setup");
+                        } else {
+                            console.log("Setting profile:", profileData);
+                            setProfile(profileData);
+
+                            if (!profileData.has_selected_plan) {
+                                openModal("plan_selection");
+                            } else if (!user.user_metadata?.username) {
+                                openModal("username_setup");
+                            }
                         }
+                    } catch (profileErr) {
+                        console.error("Error fetching profile:", profileErr);
+                        // Set default profile on error
+                        setProfile({ id: user.id, plan_tier: 'hobby', has_selected_plan: false });
                     }
                 }
-
-                setLoading(false);
             } catch (err) {
                 console.error("Error checking user:", err);
+            } finally {
+                // Always set loading to false
                 setLoading(false);
             }
         };
