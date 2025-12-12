@@ -6,64 +6,58 @@ import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import { useEffect, useState } from "react";
 import { MagneticButton } from "@/components/ui/magnetic-button";
 import { useModal } from "@/context/modal-context";
+import { useUser } from "@/context/user-context";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
-import { User } from "@supabase/supabase-js";
-import { User as UserIcon } from "lucide-react";
+import { Crown } from "lucide-react";
+import { PLANS } from "@/lib/plans";
 
 export function Navbar() {
     const { scrollY } = useScroll();
     const [isScrolled, setIsScrolled] = useState(false);
     const { openModal } = useModal();
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { user, profile, loading, isLoggedIn, currentPlan, refreshProfile } = useUser();
 
     useMotionValueEvent(scrollY, "change", (latest) => {
         if (latest > 50 && !isScrolled) setIsScrolled(true);
         if (latest <= 50 && isScrolled) setIsScrolled(false);
     });
 
+    // Handle onboarding modals
     useEffect(() => {
-        const checkUser = async () => {
-            const supabase = createBrowserClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            setUser(user);
-            setLoading(false);
+        if (!loading && isLoggedIn && profile) {
+            if (!profile.has_selected_plan) {
+                openModal("plan_selection");
+            } else if (!user?.user_metadata?.username) {
+                openModal("username_setup");
+            }
+        }
+    }, [loading, isLoggedIn, profile, user, openModal]);
 
-            if (user) {
-                // Check if profile exists and has selected a plan
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('id, has_selected_plan')
-                    .eq('id', user.id)
-                    .single();
+    // Create profile if it doesn't exist
+    useEffect(() => {
+        const ensureProfile = async () => {
+            if (!loading && isLoggedIn && user && profile === null) {
+                const supabase = createBrowserClient();
+                await supabase.from('profiles').upsert({
+                    id: user.id,
+                    email: user.email,
+                    display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+                    avatar_url: user.user_metadata?.avatar_url || '',
+                    username: user.user_metadata?.username || null,
+                    plan_tier: 'hobby',
+                    has_selected_plan: false,
+                    subscription_status: 'active',
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'id' });
 
-                if (!profile) {
-                    // Create profile if it doesn't exist
-                    await supabase.from('profiles').upsert({
-                        id: user.id,
-                        email: user.email,
-                        display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
-                        avatar_url: user.user_metadata?.avatar_url || '',
-                        username: user.user_metadata?.username || null,
-                        plan_tier: 'hobby',
-                        has_selected_plan: false,
-                        subscription_status: 'active',
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'id' });
-
-                    // New user - show plan selection modal
-                    openModal("plan_selection");
-                } else if (!profile.has_selected_plan) {
-                    // Existing user who hasn't selected a plan yet
-                    openModal("plan_selection");
-                } else if (!user.user_metadata?.username) {
-                    // Plan selected but no username - show username setup
-                    openModal("username_setup");
-                }
+                await refreshProfile();
+                openModal("plan_selection");
             }
         };
-        checkUser();
-    }, [openModal]);
+        ensureProfile();
+    }, [loading, isLoggedIn, user, profile, refreshProfile, openModal]);
+
+    const currentPlanConfig = PLANS[currentPlan];
 
     return (
         <div className="flex justify-center w-full fixed top-0 z-50 transition-all duration-300 pointer-events-none">
@@ -121,7 +115,7 @@ export function Navbar() {
                 </nav>
 
                 <div className="flex items-center gap-4">
-                    {!loading && user ? (
+                    {!loading && isLoggedIn ? (
                         <div className="flex items-center gap-4 animate-in fade-in duration-500">
 
                             {/* User Menu Dropdown */}
@@ -129,7 +123,7 @@ export function Navbar() {
                                 <div
                                     className="hidden sm:flex items-center gap-3 text-sm font-medium py-2 cursor-pointer transition-opacity hover:opacity-80"
                                 >
-                                    {user.user_metadata?.avatar_url ? (
+                                    {user?.user_metadata?.avatar_url ? (
                                         <img
                                             src={user.user_metadata.avatar_url}
                                             alt="Profile"
@@ -140,13 +134,20 @@ export function Navbar() {
                                     ) : (
                                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center border border-white/10">
                                             <span className="text-xs font-bold text-white">
-                                                {(user.user_metadata?.full_name || user.user_metadata?.username || user.email?.charAt(0) || "U").charAt(0).toUpperCase()}
+                                                {(user?.user_metadata?.full_name || user?.user_metadata?.username || user?.email?.charAt(0) || "U").charAt(0).toUpperCase()}
                                             </span>
                                         </div>
                                     )}
-                                    <span className="text-muted-foreground group-hover:text-white transition-colors">
-                                        {user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split('@')[0]}
-                                    </span>
+                                    <div className="flex flex-col">
+                                        <span className="text-muted-foreground group-hover:text-white transition-colors">
+                                            {user?.user_metadata?.full_name || user?.user_metadata?.username || user?.email?.split('@')[0]}
+                                        </span>
+                                        {/* Show current plan */}
+                                        <span className="text-[10px] text-accent flex items-center gap-1">
+                                            {currentPlan !== 'hobby' && <Crown size={10} />}
+                                            {currentPlanConfig.name}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 {/* Dropdown */}
@@ -169,7 +170,6 @@ export function Navbar() {
                                             onClick={async () => {
                                                 const supabase = createBrowserClient();
                                                 await supabase.auth.signOut();
-                                                setUser(null);
                                                 window.location.reload();
                                             }}
                                             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors text-left"
@@ -206,4 +206,3 @@ export function Navbar() {
         </div>
     );
 }
-

@@ -15,6 +15,7 @@ export const metadata: Metadata = {
 };
 
 import { SidebarProvider } from "@/components/sidebar-provider";
+import { UserProvider } from "@/context/user-context";
 
 export default function RootLayout({
   children,
@@ -24,9 +25,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${lexend.variable} scroll-behavior-smooth`}>
       <body className="font-sans antialiased bg-background text-foreground selection:bg-accent/30 selection:text-white">
-        <SidebarProvider>
-          {children}
-        </SidebarProvider>
+        <UserProvider>
+          <SidebarProvider>
+            {children}
+          </SidebarProvider>
+        </UserProvider>
       </body>
     </html>
   );
