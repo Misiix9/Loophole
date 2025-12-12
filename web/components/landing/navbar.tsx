@@ -15,6 +15,7 @@ interface Profile {
     id: string;
     plan_tier: PlanTier;
     has_selected_plan: boolean;
+    subscription_status?: string;
 }
 
 export function Navbar() {
@@ -31,52 +32,37 @@ export function Navbar() {
         if (latest <= 50 && isScrolled) setIsScrolled(false);
     });
 
+    // Fetch profile from server-side API
+    const fetchProfile = useCallback(async () => {
+        try {
+            const response = await fetch('/api/auth/profile');
+            const data = await response.json();
+
+            if (data.profile) {
+                setProfile(data.profile);
+            }
+        } catch (err) {
+            console.error("Failed to fetch profile:", err);
+        }
+    }, []);
+
     useEffect(() => {
         let isMounted = true;
-        let timeoutId: NodeJS.Timeout;
 
         const init = async () => {
             try {
                 const supabase = createClient();
 
-                // Set a timeout to prevent infinite loading - 5 seconds max
-                timeoutId = setTimeout(() => {
-                    if (isMounted && loading) {
-                        console.log("Auth check timed out");
-                        setLoading(false);
-                    }
-                }, 5000);
-
-                // Get current session (faster than getUser)
-                const { data: { session }, error } = await supabase.auth.getSession();
+                // Get current session
+                const { data: { session } } = await supabase.auth.getSession();
 
                 if (!isMounted) return;
-
-                if (error) {
-                    console.error("Session error:", error);
-                    setLoading(false);
-                    return;
-                }
 
                 if (session?.user) {
                     setUser(session.user);
 
-                    // Fetch profile from database
-                    const { data: profileData, error: profileError } = await supabase
-                        .from('profiles')
-                        .select('id, has_selected_plan, plan_tier')
-                        .eq('id', session.user.id)
-                        .single();
-
-                    // Log what we got from the database
-                    console.log("Profile fetch result:", { profileData, profileError });
-
-                    if (profileData && isMounted) {
-                        console.log("Setting profile with plan_tier:", profileData.plan_tier);
-                        setProfile(profileData as Profile);
-                    } else if (profileError) {
-                        console.error("Profile fetch error:", profileError);
-                    }
+                    // Fetch profile from server-side API (bypasses any RLS issues)
+                    await fetchProfile();
                 }
 
                 if (isMounted) {
@@ -92,30 +78,16 @@ export function Navbar() {
 
         init();
 
-        // Also listen for auth state changes
+        // Listen for auth state changes
         const supabase = createClient();
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
                 if (!isMounted) return;
 
-                console.log("Auth state changed:", event);
-
                 if (event === 'SIGNED_IN' && session?.user) {
                     setUser(session.user);
+                    await fetchProfile();
                     setLoading(false);
-
-                    // Fetch profile in background
-                    const { data: profileData, error: profileError } = await supabase
-                        .from('profiles')
-                        .select('id, has_selected_plan, plan_tier')
-                        .eq('id', session.user.id)
-                        .single();
-
-                    console.log("Profile after sign in:", { profileData, profileError });
-
-                    if (profileData && isMounted) {
-                        setProfile(profileData as Profile);
-                    }
                 } else if (event === 'SIGNED_OUT') {
                     setUser(null);
                     setProfile(null);
@@ -126,44 +98,49 @@ export function Navbar() {
 
         return () => {
             isMounted = false;
-            clearTimeout(timeoutId);
             subscription.unsubscribe();
         };
-    }, []);
+    }, [fetchProfile]);
 
-    // Sign out with timeout - force redirect after 3 seconds even if signOut fails
+    // Server-side sign out for proper session clearing
     const handleSignOut = useCallback(async () => {
         setSigningOut(true);
 
-        // Set a timeout to force redirect after 3 seconds
-        const forceRedirectTimeout = setTimeout(() => {
-            console.log("Sign out timed out, forcing redirect");
-            window.location.href = '/';
-        }, 3000);
-
         try {
-            const supabase = createClient();
-            await supabase.auth.signOut();
-            clearTimeout(forceRedirectTimeout);
+            // Call server-side sign out API
+            const response = await fetch('/api/auth/signout', { method: 'POST' });
+            const data = await response.json();
 
-            // Clear state and redirect
-            setUser(null);
-            setProfile(null);
-            window.location.href = '/';
+            if (data.success) {
+                // Also sign out client-side to clear local state
+                const supabase = createClient();
+                await supabase.auth.signOut();
+
+                // Clear state
+                setUser(null);
+                setProfile(null);
+
+                // Redirect to home
+                window.location.href = '/';
+            } else {
+                console.error("Sign out failed:", data.error);
+                // Still try to sign out client-side
+                const supabase = createClient();
+                await supabase.auth.signOut();
+                window.location.href = '/';
+            }
         } catch (err) {
             console.error("Sign out error:", err);
-            clearTimeout(forceRedirectTimeout);
-            // Force redirect on error
+            // Fallback: try client-side sign out
+            const supabase = createClient();
+            await supabase.auth.signOut();
             window.location.href = '/';
         }
     }, []);
 
-    // Get plan from profile state
-    const currentPlan = profile?.plan_tier || 'hobby';
-    const currentPlanConfig = PLANS[currentPlan] || PLANS['hobby'];
-
-    // Log the current plan for debugging
-    console.log("Current plan from profile:", currentPlan, "Profile state:", profile);
+    // Only show plan if profile is loaded
+    const currentPlan = profile?.plan_tier;
+    const currentPlanConfig = currentPlan ? PLANS[currentPlan] : null;
 
     return (
         <div className="flex justify-center w-full fixed top-0 z-50 transition-all duration-300 pointer-events-none">
@@ -247,10 +224,13 @@ export function Navbar() {
                                         <span className="text-muted-foreground group-hover:text-white transition-colors">
                                             {user.user_metadata?.full_name || user.email?.split('@')[0]}
                                         </span>
-                                        <span className="text-[10px] text-accent flex items-center gap-1">
-                                            {currentPlan !== 'hobby' && <Crown size={10} />}
-                                            {currentPlanConfig.name}
-                                        </span>
+                                        {/* Only show plan if profile is loaded */}
+                                        {currentPlanConfig && (
+                                            <span className="text-[10px] text-accent flex items-center gap-1">
+                                                {currentPlan !== 'hobby' && <Crown size={10} />}
+                                                {currentPlanConfig.name}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
 

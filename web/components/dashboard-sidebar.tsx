@@ -46,25 +46,30 @@ export function DashboardSidebar() {
       const { data: teamsData } = await supabase.from('teams').select('*');
       if (teamsData) setTeams(teamsData);
 
-      // Fetch user and profile
+      // Fetch user
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
 
+      // Fetch profile from server-side API (ensures correct data)
       if (user) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('id, plan_tier, display_name, avatar_url')
-          .eq('id', user.id)
-          .single();
+        try {
+          const response = await fetch('/api/auth/profile');
+          const data = await response.json();
 
-        if (profileData) setProfile(profileData);
+          if (data.profile) {
+            setProfile(data.profile);
+          }
+        } catch (err) {
+          console.error('Profile fetch error:', err);
+        }
       }
     };
     fetchData();
   }, []);
 
-  const currentPlan = profile?.plan_tier || 'hobby';
-  const currentPlanConfig = PLANS[currentPlan] || PLANS['hobby'];
+  // Only show plan if profile is loaded
+  const currentPlan = profile?.plan_tier;
+  const currentPlanConfig = currentPlan ? PLANS[currentPlan] : null;
 
   const NavItem = ({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive: boolean }) => {
     const ButtonContent = (
@@ -110,9 +115,21 @@ export function DashboardSidebar() {
   };
 
   const handleSignOut = async () => {
-    const client = createClient();
-    await client.auth.signOut();
-    window.location.href = '/';
+    try {
+      // Call server-side sign out API for proper session clearing
+      await fetch('/api/auth/signout', { method: 'POST' });
+
+      // Also sign out client-side
+      const client = createClient();
+      await client.auth.signOut();
+
+      // Redirect to home
+      window.location.href = '/';
+    } catch (err) {
+      console.error('Sign out error:', err);
+      // Fallback: redirect anyway
+      window.location.href = '/';
+    }
   };
 
   return (
@@ -244,7 +261,7 @@ export function DashboardSidebar() {
                   </TooltipTrigger>
                   <TooltipContent side="right">
                     <div className="text-sm font-medium">{user.user_metadata?.full_name || user.email?.split('@')[0]}</div>
-                    <div className="text-xs text-muted-foreground">{currentPlanConfig.name}</div>
+                    {currentPlanConfig && <div className="text-xs text-muted-foreground">{currentPlanConfig.name}</div>}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -269,10 +286,12 @@ export function DashboardSidebar() {
                   <div className="text-sm font-medium text-foreground truncate">
                     {user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split('@')[0]}
                   </div>
-                  <div className="text-[10px] text-accent flex items-center gap-1">
-                    {currentPlan !== 'hobby' && <Crown size={10} />}
-                    {currentPlanConfig.name}
-                  </div>
+                  {currentPlanConfig && (
+                    <div className="text-[10px] text-accent flex items-center gap-1">
+                      {currentPlan !== 'hobby' && <Crown size={10} />}
+                      {currentPlanConfig.name}
+                    </div>
+                  )}
                 </div>
               </>
             )}
