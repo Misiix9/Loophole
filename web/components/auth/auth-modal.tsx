@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Github, Mail, Check, CreditCard, Sparkles, Crown, ArrowRight, Building, Zap, Shield, RefreshCw } from "lucide-react";
+import { Github, Mail, Check, CreditCard, Sparkles, Crown, ArrowRight, Building, Zap, Shield, RefreshCw, Settings } from "lucide-react";
 import { useModal } from "@/context/modal-context";
+import { PLANS } from "@/lib/plans";
 
 export function AuthModalContent({ view = "auth" }: { view?: "auth" | "plan" | "username" | "settings" | "billing" }) {
     if (view === "plan") {
@@ -611,7 +612,37 @@ function SettingsView() {
 
 function BillingView() {
     const [loading, setLoading] = useState(false);
+    const [profile, setProfile] = useState<{
+        plan_tier: 'hobby' | 'creator' | 'startup';
+        subscription_status: string;
+        stripe_subscription_id: string | null;
+    } | null>(null);
     const { closeModal } = useModal();
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            const supabase = createBrowserClient();
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (user) {
+                const { data } = await supabase
+                    .from('profiles')
+                    .select('plan_tier, subscription_status, stripe_subscription_id')
+                    .eq('id', user.id)
+                    .single();
+
+                if (data) {
+                    setProfile(data);
+                }
+            }
+        };
+        fetchProfile();
+    }, []);
+
+    const currentPlan = profile?.plan_tier || 'hobby';
+    const planConfig = PLANS[currentPlan] || PLANS['hobby'];
+    const isActive = profile?.subscription_status === 'active' || currentPlan === 'hobby';
+    const hasStripeSubscription = !!profile?.stripe_subscription_id;
 
     async function handleManageBilling() {
         setLoading(true);
@@ -624,6 +655,11 @@ function BillingView() {
         window.location.href = `/api/checkout?plan=${plan}&setup=true`;
     }
 
+    // Determine which upgrade options to show
+    const planRank = { hobby: 0, creator: 1, startup: 2 };
+    const showCreatorUpgrade = planRank[currentPlan] < planRank['creator'];
+    const showStartupUpgrade = planRank[currentPlan] < planRank['startup'];
+
     return (
         <div className="p-8">
             <div className="text-center mb-8">
@@ -632,39 +668,73 @@ function BillingView() {
             </div>
 
             <div className="space-y-4">
+                {/* Current Plan Display */}
                 <div className="p-4 rounded-xl border border-white/10 bg-white/5">
                     <div className="flex justify-between items-center">
                         <div>
-                            <div className="font-bold">Current Plan</div>
-                            <div className="text-sm text-muted-foreground">Hobby (Free)</div>
+                            <div className="font-bold flex items-center gap-2">
+                                Current Plan
+                                {currentPlan !== 'hobby' && <Crown size={14} className="text-accent" />}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                {planConfig.name} ({planConfig.priceDisplay === '$0' ? 'Free' : planConfig.priceDisplay + '/month'})
+                            </div>
                         </div>
-                        <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded">Active</span>
+                        <span className={`text-xs px-2 py-1 rounded ${isActive
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : 'bg-yellow-500/20 text-yellow-400'
+                            }`}>
+                            {isActive ? 'Active' : profile?.subscription_status || 'Unknown'}
+                        </span>
                     </div>
                 </div>
 
-                <div className="space-y-2">
-                    <div className="text-xs text-muted-foreground font-bold uppercase">Upgrade</div>
+                {/* Upgrade Options */}
+                {(showCreatorUpgrade || showStartupUpgrade) && (
+                    <div className="space-y-2">
+                        <div className="text-xs text-muted-foreground font-bold uppercase">Upgrade</div>
+
+                        {showCreatorUpgrade && (
+                            <button
+                                onClick={() => handleUpgrade('creator')}
+                                disabled={loading}
+                                className="w-full flex items-center justify-between p-4 rounded-xl border border-accent/50 bg-accent/5 hover:bg-accent/10 transition-all text-left disabled:opacity-50"
+                            >
+                                <div>
+                                    <div className="font-bold">{PLANS.creator.name}</div>
+                                    <div className="text-xs text-muted-foreground">{PLANS.creator.priceDisplay}/month</div>
+                                </div>
+                                <CreditCard size={18} className="text-accent" />
+                            </button>
+                        )}
+
+                        {showStartupUpgrade && (
+                            <button
+                                onClick={() => handleUpgrade('startup')}
+                                disabled={loading}
+                                className="w-full flex items-center justify-between p-4 rounded-xl border border-white/10 hover:bg-white/5 transition-all text-left disabled:opacity-50"
+                            >
+                                <div>
+                                    <div className="font-bold">{PLANS.startup.name}</div>
+                                    <div className="text-xs text-muted-foreground">{PLANS.startup.priceDisplay}/month</div>
+                                </div>
+                                <CreditCard size={18} className="text-muted-foreground" />
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* Manage Subscription (for paid plans) */}
+                {hasStripeSubscription && (
                     <button
-                        onClick={() => handleUpgrade('creator')}
-                        className="w-full flex items-center justify-between p-4 rounded-xl border border-accent/50 bg-accent/5 hover:bg-accent/10 transition-all text-left"
+                        onClick={handleManageBilling}
+                        disabled={loading}
+                        className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-white/10 hover:bg-white/5 transition-all text-sm text-muted-foreground hover:text-white disabled:opacity-50"
                     >
-                        <div>
-                            <div className="font-bold">Creator</div>
-                            <div className="text-xs text-muted-foreground">$9/month</div>
-                        </div>
-                        <CreditCard size={18} className="text-accent" />
+                        <Settings size={16} />
+                        Manage Subscription
                     </button>
-                    <button
-                        onClick={() => handleUpgrade('startup')}
-                        className="w-full flex items-center justify-between p-4 rounded-xl border border-white/10 hover:bg-white/5 transition-all text-left"
-                    >
-                        <div>
-                            <div className="font-bold">Startup</div>
-                            <div className="text-xs text-muted-foreground">$29/month</div>
-                        </div>
-                        <CreditCard size={18} className="text-muted-foreground" />
-                    </button>
-                </div>
+                )}
 
                 <button
                     type="button"
